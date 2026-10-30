@@ -1,12 +1,12 @@
 # House Budget
 
-Blank, fillable cost estimate worksheet / progress chart for a custom home build.
+Blank, fillable cost estimate worksheet / progress chart for our 40×60 barndominium (Barndominium Plan Set, Rev 0, Oct 27 2026): 2,400 sf main floor, 1,642 sf loft, 2,100 sf wraparound timber porches.
 
-- Phases 1–4 with every line item from the original worksheet, plus inspection checkpoints
+- Phases 1–4 with line items for this plan set (steel shell, wood framing, loft, stair, porches, windows/doors) with plan notes and quantities, plus inspection checkpoints
 - Estimate, Actual Paid, auto Difference, Vendor, Date Complete and % done per item
 - Phase subtotals, builder fee ($ or %), and running totals
 - Edit mode to rename, add or remove items, sections, inspections and phases
-- Build Steps tab: 75-step construction order in 7 stages with inspection gates, a "Next up" card and progress
+- Build Steps tab: 82-step construction order in 9 stages for the steel shell + wood interior build with inspection gates, a "Next up" card and progress
 - Cloud sync across devices via Firebase Firestore (project housebudget-a0972) using a private sync code
 - Saves automatically in the browser; Backup/Restore (JSON), CSV export and Print
 
