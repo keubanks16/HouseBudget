@@ -67,6 +67,14 @@ details[open] .chev{transform:rotate(90deg)}
 body.editing .row:not(.hdr):not(.insp),body.editing .cols{grid-template-columns:minmax(180px,2.2fr) 1fr 1fr 1fr 1.3fr 1fr .6fr 30px}
 body.editing .cols::after{content:""}
 .edit-only{display:none}
+header.top .wrap{position:relative}
+.syncpill{position:absolute;right:12px;top:0;display:flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#f4f1ea;border-radius:20px;padding:5px 11px;font-size:13px;cursor:pointer}
+.syncpill .dot{width:8px;height:8px;border-radius:50%;background:#9aa39d}
+.syncpill.ok .dot{background:#5fd18e}.syncpill.busy .dot{background:#e8c25a}.syncpill.err .dot{background:#ff7a5c}
+#syncPanel h3{margin:0 0 6px;font-size:17px}
+#syncPanel p{margin:6px 0;font-size:14px}
+.codebox{font-family:ui-monospace,Menlo,monospace;font-size:15px;background:#f1ede4;border-radius:8px;padding:8px 10px;word-break:break-all;margin:6px 0}
+.row2{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .tabs{display:flex;gap:6px;margin-top:12px}
 .tab{border:0;border-radius:10px 10px 0 0;padding:9px 14px;background:rgba(255,255,255,.1);color:#f4f1ea;cursor:pointer;font-weight:600}
 .tab.active{background:var(--bg);color:var(--ink)}
@@ -133,11 +141,13 @@ body.editing .view-only{display:none}
 <body>
 <header class="top">
   <div class="wrap" style="padding-bottom:0">
+    <button class="syncpill" id="syncPill" type="button"><span class="dot"></span><span id="syncTxt">Sync off</span></button>
     <h1 id="title">House Budget</h1>
     <div class="sub">Cost Estimate Worksheet / Progress Chart</div>
     <nav class="tabs"><button class="tab active" data-tab="budget">💲 Budget</button><button class="tab" data-tab="steps">🪜 Build Steps</button></nav>
   </div>
 </header>
+<div class="wrap" id="syncWrap" style="padding-bottom:0" hidden><div class="card" id="syncPanel"></div></div>
 
 <div class="wrap" id="tabSteps" hidden>
   <div class="summary">
@@ -224,7 +234,8 @@ let S;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||!S.phases)S=fresh();
 let saveT;const flush=()=>{clearTimeout(saveT);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
-function save(){clearTimeout(saveT);saveT=setTimeout(flush,200)}
+let onSave=null;
+function save(){clearTimeout(saveT);saveT=setTimeout(flush,200);if(onSave)onSave()}
 addEventListener('pagehide',flush);document.addEventListener('visibilitychange',()=>{if(document.hidden)flush()});
 
 const $=s=>document.querySelector(s);
@@ -483,6 +494,125 @@ function showTab(tab){
   S.tab=tab;save();if(tab==='steps')renderSteps();else render();scrollTo(0,0);
 }
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+
+// ---------- Cloud sync (Firebase Firestore, REST) ----------
+const FS_PROJECT='housebudget-a0972';
+const FS_URL=`https://firestore.googleapis.com/v1/projects/${FS_PROJECT}/databases/(default)/documents/budgets/`;
+const SKEY='housebudget.sync';
+let SY={};try{SY=JSON.parse(localStorage.getItem(SKEY))||{}}catch(e){}
+const saveSY=()=>{try{localStorage.setItem(SKEY,JSON.stringify(SY))}catch(e){}};
+let pushT=null,busy=false,pendingRemote=null,lastPayload=null,syncState='off',syncMsg='',lastOk=0,panelOpen=false;
+const payload=()=>{const {open,tab,...rest}=S;return JSON.stringify(rest)};
+function newCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';const b=crypto.getRandomValues(new Uint8Array(24));
+  let c='';for(let i=0;i<24;i++){c+=a[b[i]%a.length];if(i%6===5&&i<23)c+='-'}return c}
+const cleanCode=c=>String(c||'').trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+async function fsGet(code,metaOnly){
+  const r=await fetch(FS_URL+encodeURIComponent(code)+(metaOnly?'?mask.fieldPaths=updatedAt':''),{cache:'no-store'});
+  if(r.status===404)return null;
+  if(!r.ok)throw new Error(await errText(r));
+  const d=await r.json(),f=d.fields||{};
+  return{at:Number(f.updatedAt?.integerValue||0),json:f.json?.stringValue};
+}
+async function fsPut(code,json){
+  const at=Date.now();
+  const r=await fetch(FS_URL+encodeURIComponent(code),{method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({fields:{json:{stringValue:json},updatedAt:{integerValue:String(at)}}})});
+  if(!r.ok)throw new Error(await errText(r));
+  return at;
+}
+async function errText(r){let t='';try{t=(await r.json()).error?.message||''}catch(e){}
+  if(r.status===403)return'Permission denied — check the Firestore rules';return`Error ${r.status}${t?': '+t:''}`}
+function setSync(state,msg){syncState=state;syncMsg=msg||'';if(state==='ok')lastOk=Date.now();
+  const pill=$('#syncPill');pill.className='syncpill '+state;
+  $('#syncTxt').textContent=!SY.code?'Sync off':state==='busy'?'Syncing…':state==='err'?'Sync error':'Synced';
+  if(panelOpen)renderSync();}
+function rerender(){if(S.tab==='steps')renderSteps();else render()}
+const typing=()=>{const a=document.activeElement;return a&&a.matches('input,select,textarea')&&!a.closest('#syncPanel')};
+function applyRemote(doc){
+  if(!doc||!doc.json)return;
+  if(typing()){pendingRemote=doc;return}
+  let d;try{d=JSON.parse(doc.json)}catch(e){return}
+  if(!d.phases)return;
+  S={...d,open:S.open||[0],tab:S.tab||'budget'};S.steps=S.steps||{};
+  try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+  lastPayload=payload();SY.lastAt=doc.at;SY.dirty=false;saveSY();rerender();
+}
+document.addEventListener('focusout',()=>setTimeout(()=>{if(pendingRemote&&!typing()){const d=pendingRemote;pendingRemote=null;applyRemote(d)}},60));
+onSave=()=>{if(!SY.code)return;const p=payload();if(p===lastPayload)return;
+  SY.dirty=true;saveSY();clearTimeout(pushT);pushT=setTimeout(doPush,700)};
+async function doPush(){
+  if(!SY.code)return;
+  if(busy){clearTimeout(pushT);pushT=setTimeout(doPush,500);return}
+  busy=true;setSync('busy');
+  try{const p=payload();const at=await fsPut(SY.code,p);lastPayload=p;SY.lastAt=at;
+    if(payload()===p)SY.dirty=false;saveSY();setSync('ok');if(SY.dirty){clearTimeout(pushT);pushT=setTimeout(doPush,300)}}
+  catch(e){setSync('err',e.message);clearTimeout(pushT);pushT=setTimeout(doPush,10000)}
+  finally{busy=false}
+}
+async function poll(){
+  if(!SY.code||busy||SY.dirty||document.hidden)return;
+  busy=true;
+  try{const m=await fsGet(SY.code,true);
+    if(m&&m.at!==(SY.lastAt||0)){const full=await fsGet(SY.code,false);busy=false;applyRemote(full)}
+    else if(!m){busy=false;SY.dirty=true;saveSY();doPush();return}
+    setSync('ok');}
+  catch(e){setSync('err',e.message)}
+  finally{busy=false}
+}
+setInterval(poll,4000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll()});
+addEventListener('online',()=>{SY.dirty?doPush():poll()});
+async function turnOn(){
+  const code=newCode();setSync('busy');
+  try{const p=payload();const at=await fsPut(code,p);SY={code,lastAt:at,dirty:false};lastPayload=p;saveSY();setSync('ok');toast('Cloud sync is on')}
+  catch(e){SY={};saveSY();setSync('err',e.message);alert("Couldn't turn on sync.\n\n"+e.message)}
+  renderSync();
+}
+async function join(raw){
+  const code=cleanCode(raw);if(code.length<20){alert('That sync code looks too short.');return false}
+  setSync('busy');
+  try{const doc=await fsGet(code,false);
+    if(!doc){setSync(SY.code?'ok':'off');alert('No budget was found with that code. Double-check it on the other device.');return false}
+    if(!confirm('Load the synced budget onto this device? Anything only on this device will be replaced.')){setSync(SY.code?'ok':'off');return false}
+    SY={code,lastAt:0,dirty:false};saveSY();applyRemote(doc);setSync('ok');toast('Synced with your other devices');renderSync();return true}
+  catch(e){setSync('err',e.message);alert("Couldn't connect.\n\n"+e.message);return false}
+}
+const shareLink=()=>location.origin+location.pathname+'?sync='+SY.code;
+function renderSync(){
+  const el=$('#syncPanel');
+  if(!SY.code){el.innerHTML=`<h3>☁️ Cloud sync</h3>
+    <p>Keep this budget the same on every phone and computer. Changes show up on the other devices within a few seconds.</p>
+    <div class="row2"><button class="btn primary" id="syOn">Turn on sync for this budget</button></div>
+    <p class="hint" style="margin-top:14px">Already turned on somewhere else? Enter that device's sync code:</p>
+    <div class="row2"><input class="t" id="syCode" placeholder="xxxxxx-xxxxxx-xxxxxx-xxxxxx" autocapitalize="off" autocomplete="off" style="flex:1;min-width:200px"><button class="btn" id="syJoin">Join</button></div>
+    <div class="row2"><button class="btn" id="syClose">Close</button></div>`;}
+  else{const ago=lastOk?Math.max(0,Math.round((Date.now()-lastOk)/1000)):null;
+    el.innerHTML=`<h3>☁️ Cloud sync is on</h3>
+    <p>${syncState==='err'?'⚠️ '+esc(syncMsg)+' — will keep retrying.':syncState==='busy'?'Syncing…':'✅ Up to date'+(ago!==null?` (checked ${ago<5?'just now':ago+'s ago'})`:'')}</p>
+    <p class="hint">To add another device, open this link on it, or enter this code under Cloud sync there:</p>
+    <div class="codebox">${esc(SY.code)}</div>
+    <div class="row2"><button class="btn primary" id="syShare">Share link</button><button class="btn" id="syCopy">Copy code</button></div>
+    <p class="hint">Anyone with this code can see and edit the budget, so only share it with people you trust.</p>
+    <div class="row2"><button class="btn" id="syClose">Close</button><button class="btn danger" id="syOff">Turn off on this device</button></div>`;}
+}
+$('#syncPill').onclick=()=>{panelOpen=!panelOpen;$('#syncWrap').hidden=!panelOpen;if(panelOpen){renderSync();poll()}};
+$('#syncPanel').addEventListener('click',async ev=>{
+  const id=ev.target.id;
+  if(id==='syClose'){panelOpen=false;$('#syncWrap').hidden=true}
+  else if(id==='syOn')turnOn();
+  else if(id==='syJoin')join($('#syCode').value);
+  else if(id==='syCopy'){try{await navigator.clipboard.writeText(SY.code);toast('Code copied')}catch(e){prompt('Copy this code:',SY.code)}}
+  else if(id==='syShare'){const url=shareLink();
+    if(navigator.share){try{await navigator.share({title:'House Budget',text:'Open this to sync our house budget:',url})}catch(e){}}
+    else{try{await navigator.clipboard.writeText(url);toast('Link copied')}catch(e){prompt('Copy this link:',url)}}}
+  else if(id==='syOff'){if(confirm('Stop syncing on this device? Your data stays here, and other devices keep syncing.')){SY={};saveSY();setSync('off');renderSync()}}
+});
+(async()=>{
+  const q=new URLSearchParams(location.search).get('sync');
+  if(q){history.replaceState(null,'',location.pathname);if(cleanCode(q)!==SY.code)await join(q)}
+  if(SY.code){lastPayload=SY.dirty?null:payload();setSync('busy');if(SY.dirty)doPush();else poll()}
+  else setSync('off');
+})();
 render();showTab(S.tab||'budget');
 })();
 </script>
