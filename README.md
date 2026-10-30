@@ -19,7 +19,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /budgets/{code} {
-      allow get, create, update: if code.size() >= 20 && request.resource == null || code.size() >= 20 && request.resource.data.json is string && request.resource.data.json.size() < 900000;
+      allow get: if code.size() >= 20;
+      allow create, update: if code.size() >= 20
+        && request.resource.data.json is string
+        && request.resource.data.json.size() < 900000;
       allow list, delete: if false;
     }
   }
