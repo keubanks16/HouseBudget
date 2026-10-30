@@ -67,6 +67,30 @@ details[open] .chev{transform:rotate(90deg)}
 body.editing .row:not(.hdr):not(.insp),body.editing .cols{grid-template-columns:minmax(180px,2.2fr) 1fr 1fr 1fr 1.3fr 1fr .6fr 30px}
 body.editing .cols::after{content:""}
 .edit-only{display:none}
+.tabs{display:flex;gap:6px;margin-top:12px}
+.tab{border:0;border-radius:10px 10px 0 0;padding:9px 14px;background:rgba(255,255,255,.1);color:#f4f1ea;cursor:pointer;font-weight:600}
+.tab.active{background:var(--bg);color:var(--ink)}
+header.top{padding-bottom:0}
+.nextup{margin:0;border-left:5px solid var(--accent)}
+.nextup .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.nextup .v{font-size:17px;font-weight:700;margin-top:2px}
+.nextup .d{font-size:13px;color:var(--muted)}
+.stage{background:var(--card);border:1px solid var(--line);border-radius:14px;margin:12px 0;overflow:hidden}
+.stage h2{margin:0;padding:12px 14px;font-size:16px;background:#efe9dc;display:flex;gap:10px;align-items:baseline}
+.stage h2 small{margin-left:auto;font-weight:500;color:var(--muted);font-size:12px}
+.step{display:grid;grid-template-columns:34px 26px 1fr 150px;gap:10px;align-items:start;padding:10px 14px;border-bottom:1px solid #efebe2}
+.step:last-child{border-bottom:0}
+.step .no{font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums;padding-top:2px}
+.step input[type=checkbox]{width:22px;height:22px;accent-color:var(--accent);margin:0}
+.step .ti{font-weight:600}
+.step .de{font-size:13px;color:var(--muted);margin-top:2px}
+.step .t{padding:6px 8px;font-size:13px}
+.step.gate{background:var(--warn-soft)}
+.step.gate .ti{color:var(--warn)}
+.step.gate.ok{background:#d4e8dc}.step.gate.ok .ti{color:var(--accent)}
+.step.ok .ti{text-decoration:line-through;text-decoration-color:var(--accent);text-decoration-thickness:2px}
+.step.next{outline:2px solid var(--gold);outline-offset:-2px;background:#fbf4e3}
+@media (max-width:760px){.step{grid-template-columns:28px 24px 1fr}.step .dt{grid-column:3}}
 body.editing .edit-only{display:inline-flex}
 body.editing .view-only{display:none}
 .x{border:0;background:var(--warn-soft);color:var(--warn);border-radius:8px;width:30px;height:30px;cursor:pointer;align-items:center;justify-content:center}
@@ -111,10 +135,21 @@ body.editing .view-only{display:none}
   <div class="wrap" style="padding-bottom:0">
     <h1 id="title">House Budget</h1>
     <div class="sub">Cost Estimate Worksheet / Progress Chart</div>
+    <nav class="tabs"><button class="tab active" data-tab="budget">💲 Budget</button><button class="tab" data-tab="steps">🪜 Build Steps</button></nav>
   </div>
 </header>
 
-<div class="wrap">
+<div class="wrap" id="tabSteps" hidden>
+  <div class="summary">
+    <div class="card nextup" id="nextUp"></div>
+    <div class="bar"><i id="stBar"></i></div>
+    <div class="hint" id="stNote" style="margin-top:4px"></div>
+  </div>
+  <p class="hint">Work top to bottom. 🛑 Red rows are inspections. Don't start the next step until the inspection passes. Checking an inspection here also checks it on the Budget tab.</p>
+  <div id="stepList"></div>
+</div>
+
+<div class="wrap" id="tabBudget">
   <div class="summary">
     <div class="stats">
       <div class="stat"><div class="k">Total Estimate</div><div class="v" id="sEst">$0</div></div>
@@ -183,7 +218,7 @@ function mkRow(s){
   if(s[0]==='!')return{id:id(),type:'insp',label:s.slice(1),passed:false,date:''};
   const sub=s[0]==='>';return{id:id(),type:'item',sub,label:sub?s.slice(1):s,pct:'',est:'',paid:'',vendor:'',date:''};
 }
-function fresh(){return{proj:{name:'',owner:'',address:'',builder:''},fee:{mode:'amt',val:''},open:[0],
+function fresh(){return{steps:{},tab:'budget',proj:{name:'',owner:'',address:'',builder:''},fee:{mode:'amt',val:''},open:[0],
   phases:TEMPLATE.map(([name,rows])=>({id:id(),name,rows:rows.map(mkRow)}))};}
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
@@ -305,7 +340,7 @@ const stamp=()=>new Date().toISOString().slice(0,10);
 $('#btnSave').onclick=()=>{download(`house-budget-${stamp()}.json`,JSON.stringify(S,null,1),'application/json');toast('Backup saved')};
 $('#btnLoad').onclick=()=>$('#fileIn').click();
 $('#fileIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;
-  try{const d=JSON.parse(await f.text());if(!d.phases)throw 0;if(confirm('Replace everything here with this backup?')){S=d;S.open=S.open||[0];save();render();toast('Backup restored')}}
+  try{const d=JSON.parse(await f.text());if(!d.phases)throw 0;if(confirm('Replace everything here with this backup?')){S=d;S.open=S.open||[0];S.steps=S.steps||{};save();render();toast('Backup restored')}}
   catch(err){alert("That file doesn't look like a House Budget backup.")}e.target.value=''};
 $('#btnCsv').onclick=()=>{
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
@@ -318,7 +353,137 @@ $('#btnCsv').onclick=()=>{
   L.push('',[ '','Materials and Cost','','',e.toFixed(2)].map(q).join(','),['','Builder Fee','','',fee.toFixed(2)].map(q).join(','),['','Total Est. Cost','','',(e+fee).toFixed(2)].map(q).join(','));
   download(`house-budget-${stamp()}.csv`,L.join('\n'),'text/csv');toast('CSV exported')};
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1800)}
-render();
+// ---------- Build Steps (order of construction) ----------
+// '!' = inspection gate (label matches the Budget tab inspection)
+const STEPS=[
+ ['Plans & Permits','Get approvals lined up before anyone touches dirt',[
+  ['Finalize house plans & budget','Lock the floor plan and fill in estimates on the Budget tab'],
+  ['Site plan / zoning verification','Confirm setbacks, lot coverage and zoning with the county'],
+  ['Flood elevation plan','Only if the lot is in or near a flood zone'],
+  ['Erosion control plan','Required for the land disturbance permit'],
+  ['Environmental Health / septic permit','Perc/soil test and septic layout approval'],
+  ['LDP (Land Disturbance Permit)','Lets you start clearing and grading'],
+  ['Builders risk insurance','Have coverage in place before work and materials arrive'],
+  ['Pre-construction permits & fees','Pay county PC permits and impact/plan fees']]],
+ ['Site Prep','Get the lot ready for a foundation',[
+  ['Permit box posted','Permits must be on display at the road'],
+  ['Construction entrance — gravel & mat','Keeps mud off the road'],
+  ['Silt fence','Install erosion control before grading'],
+  ['Clearing & grading','Trees, stumps and rough grade'],
+  ['Dumpster & port-a-potty','Set before crews arrive'],
+  ['Building pad','Bring in and compact fill for the slab'],
+  ['!Site','Erosion control / site inspection'],
+  ['Temporary electric','Temp pole and power for the crews'],
+  ['House stake & foundation survey','Surveyor marks the exact footprint'],
+  ['Building permit','Pull the building permit and pay fees']]],
+ ['Foundation','Everything under and in the slab',[
+  ['Foundation materials & box set','Forms set for the slab and footings'],
+  ['Under-slab plumbing','Drains and supply lines in before the pour'],
+  ['!Under Slab','Plumbing inspection — pipes must be visible'],
+  ['Foundation prep','Gravel, vapor barrier, rebar/wire mesh'],
+  ['Termite pre-treat','Treat soil before the concrete goes down'],
+  ['!Foundation','Pre-pour inspection'],
+  ['Pour concrete slab','Materials and labor'],
+  ['Backfill','Fill in around the slab edges'],
+  ['Dumpster & job site clean up','']]],
+ ['Dry-In','Frame it, roof it and close it up from the weather',[
+  ['Framing / truss package','Steel or wood frame and trusses go up'],
+  ['Roofing','Roof package and labor'],
+  ['!Nail Pattern','Sheathing / fastener inspection'],
+  ['Windows & exterior doors','Door and window package installed'],
+  ['Exterior vapor wrap','House wrap around the walls'],
+  ['!Wrap','Wrap inspection before siding covers it'],
+  ['Exterior finish','Siding, brick or stucco, soffit, fascia, vents'],
+  ['Patio / porch','Porch and patio structure']]],
+ ['Rough-Ins','Everything that goes inside the walls',[
+  ['!Pre Insulation','Framing check before mechanicals'],
+  ['Plumbing rough-in',''],
+  ['HVAC rough-in','Ducts, line sets and equipment pads'],
+  ['Electrical rough-in','Panel, boxes and wiring'],
+  ['Gas lines','If you have gas appliances'],
+  ['Fireplace','Install the unit and flue'],
+  ['Low voltage','Data, TV, cameras, speakers, alarm'],
+  ['!Mechanical/Framing','Rough-in inspection — all trades'],
+  ['Insulation','Walls and ceilings'],
+  ['!Insulation','Insulation inspection before drywall'],
+  ['Dumpster / clean up','']]],
+ ['Interior & Exterior Finish','Make it a house',[
+  ['Drywall','Hang, tape and finish'],
+  ['Interior trim','Doors, base, casing and trim labor'],
+  ['Paint','Prime and paint before flooring'],
+  ['Cabinets',''],
+  ['Countertops','Template after cabinets are set'],
+  ['Wall tile & flooring','Tile, hardwood, LVP, carpet last'],
+  ['Electrical trim & light package','Switches, outlets and fixtures'],
+  ['Plumbing trim','Faucets, toilets and fixtures'],
+  ['HVAC trim','Registers, thermostat and startup'],
+  ['Low voltage trim',''],
+  ['Appliances',''],
+  ['Garage doors',''],
+  ['Specialties','Mirrors, shelving, shower doors, hardware'],
+  ['Gutters',''],
+  ['Driveway',''],
+  ['Permanent power','Switch from temp to permanent service'],
+  ['!Temp Power','Power release inspection'],
+  ['Rough clean',''],
+  ['Landscaping','Final grade, sod/seed and plants'],
+  ['Pressure wash',''],
+  ['Systems walk-through','Test every system'],
+  ['!Final/CO','Final inspection — Certificate of Occupancy']]],
+ ['Closeout','Finish strong and move in',[
+  ['Final punch-out','List and fix every small issue'],
+  ['Customer walk-through',''],
+  ['Final clean',''],
+  ['Final paint touch-ups',''],
+  ['Closing','Final payments and paperwork'],
+  ['Warranty','Save warranty info and set up the 11-month walk-through'],
+  ['Move in! 🏡','']]]
+];
+if(!S.steps)S.steps={};
+const stepKey=(si,ti)=>'s'+si+':'+STEPS[si][2][ti][0];
+function inspRow(label){for(const p of S.phases)for(const r of p.rows)if(r.type==='insp'&&r.label===label)return r}
+function stepState(si,ti){const raw=STEPS[si][2][ti][0];
+  if(raw[0]==='!'){const r=inspRow(raw.slice(1));if(r)return{done:!!r.passed,date:r.date||'',insp:r}}
+  return S.steps[stepKey(si,ti)]||{done:false,date:''};}
+function renderSteps(){
+  let n=0,total=0,doneN=0,next=null;
+  const html=STEPS.map(([stage,desc,list],si)=>{
+    let sd=0;
+    const rows=list.map(([raw,de],ti)=>{
+      n++;total++;const gate=raw[0]==='!';const st=stepState(si,ti);
+      if(st.done){doneN++;sd++}else if(!next)next={si,ti,n,raw,de};
+      const ti_=gate?'🛑 Inspection: '+esc(raw.slice(1)):esc(raw);
+      return`<div class="step ${gate?'gate':''} ${st.done?'ok':''}" data-step="${si}:${ti}" id="step-${si}-${ti}">
+        <span class="no">${n}</span><input type="checkbox" data-sk="done" ${st.done?'checked':''}>
+        <div><div class="ti">${ti_}</div>${de?`<div class="de">${esc(de)}</div>`:''}</div>
+        <input class="t dt" type="date" data-sk="date" value="${esc(st.date)}" title="${gate?'Date passed':'Date done'}"></div>`}).join('');
+    return`<section class="stage"><h2>${si+1}. ${esc(stage)}<small>${sd}/${list.length} done</small></h2>
+      <div class="hint" style="padding:6px 14px 0">${esc(desc)}</div>${rows}</section>`}).join('');
+  $('#stepList').innerHTML=html;
+  if(next){const el=document.getElementById(`step-${next.si}-${next.ti}`);el&&el.classList.add('next');}
+  $('#nextUp').innerHTML=next?`<div class="k">Next up · Step ${next.n} of ${total} · ${esc(STEPS[next.si][0])}</div>
+     <div class="v">${next.raw[0]==='!'?'🛑 Inspection: '+esc(next.raw.slice(1)):esc(next.raw)}</div>${next.de?`<div class="d">${esc(next.de)}</div>`:''}`
+    :`<div class="v">🎉 Every step is done. Welcome home!</div>`;
+  $('#stBar').style.width=(doneN/total*100)+'%';
+  $('#stNote').textContent=`${doneN} of ${total} steps done (${Math.round(doneN/total*100)}%)`;
+}
+document.addEventListener('input',ev=>{
+  const t=ev.target,el=t.closest('[data-step]');if(!el||!t.dataset.sk)return;
+  const [si,ti]=el.dataset.step.split(':').map(Number);const st=stepState(si,ti);
+  const val=t.type==='checkbox'?t.checked:t.value;
+  if(t.dataset.sk==='done'&&val&&!st.date)st.date=new Date().toISOString().slice(0,10);
+  st[t.dataset.sk]=val;
+  if(st.insp){st.insp.passed=st.done;st.insp.date=st.date}
+  else S.steps[stepKey(si,ti)]={done:st.done,date:st.date};
+  save();renderSteps();
+});
+function showTab(tab){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  $('#tabBudget').hidden=tab!=='budget';$('#tabSteps').hidden=tab!=='steps';
+  S.tab=tab;save();if(tab==='steps')renderSteps();else render();scrollTo(0,0);
+}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+render();showTab(S.tab||'budget');
 })();
 </script>
 </body>
