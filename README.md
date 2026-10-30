@@ -6,6 +6,7 @@ Blank, fillable cost estimate worksheet / progress chart for a custom home build
 - Estimate, Actual Paid, auto Difference, Vendor, Date Complete and % done per item
 - Phase subtotals, builder fee ($ or %), and running totals
 - Edit mode to rename, add or remove items, sections, inspections and phases
+- Build Steps tab: 75-step construction order in 7 stages with inspection gates, a "Next up" card and progress
 - Saves automatically in the browser; Backup/Restore (JSON), CSV export and Print
 
 Open `index.html` or the GitHub Pages site. On a phone, use Share → Add to Home Screen.
