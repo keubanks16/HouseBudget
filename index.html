@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="House Budget">
+<meta name="theme-color" content="#1f2a24">
+<title>House Budget</title>
+<style>
+:root{
+  --bg:#f4f1ea; --card:#fffdf8; --ink:#1f2a24; --muted:#6b736d; --line:#e2ddd2;
+  --accent:#2f6b4f; --accent-soft:#e3efe8; --warn:#b4472f; --warn-soft:#f7e4de; --gold:#a07a2c;
+  --head:#1f2a24;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+button,input,select{font:inherit;color:inherit}
+header.top{background:var(--head);color:#f4f1ea;padding:calc(14px + env(safe-area-inset-top)) 16px 14px}
+.top h1{margin:0;font-size:20px;letter-spacing:.3px}
+.top .sub{opacity:.7;font-size:13px}
+.wrap{max-width:1100px;margin:0 auto;padding:0 12px 120px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;margin:12px 0;padding:14px}
+.proj{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+label.f{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:4px}
+input.t{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 10px;width:100%;min-width:0}
+input.t:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+.summary{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0 4px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.stat .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.stat .v{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar{height:6px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:8px}
+.bar>i{display:block;height:100%;background:var(--accent);width:0}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 12px;cursor:pointer}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.on{background:var(--gold);color:#fff;border-color:var(--gold)}
+.btn.danger{color:var(--warn)}
+details.phase{background:var(--card);border:1px solid var(--line);border-radius:14px;margin:12px 0;overflow:hidden}
+details.phase>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:10px;background:#efe9dc}
+details.phase>summary::-webkit-details-marker{display:none}
+.phase .pname{font-weight:700;font-size:16px}
+.phase .ptot{margin-left:auto;text-align:right;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.phase .ptot b{color:var(--ink);font-size:14px}
+.chev{transition:transform .2s}
+details[open] .chev{transform:rotate(90deg)}
+.cols,.row{display:grid;grid-template-columns:minmax(180px,2.2fr) 1fr 1fr 1fr 1.3fr 1fr .6fr;gap:6px;align-items:center;padding:6px 12px}
+.cols{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--line);padding-top:8px}
+.row{border-bottom:1px solid #efebe2}
+.row:last-child{border-bottom:0}
+.row .lbl{font-weight:500}
+.row.sub .lbl{padding-left:18px;color:#3b4740}
+.row.sub .lbl::before{content:"↳ ";color:var(--muted)}
+.row .t{padding:7px 8px;font-size:14px}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.diff{font-variant-numeric:tabular-nums;text-align:right;font-weight:600;padding-right:4px}
+.diff.pos{color:var(--accent)} .diff.neg{color:var(--warn)}
+.row.hdr{background:#f8f5ee;grid-template-columns:1fr auto;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--gold)}
+.row.insp{grid-template-columns:minmax(180px,2.2fr) auto 1fr auto;background:var(--accent-soft)}
+.row.insp .lbl{color:var(--accent);font-weight:600}
+.row.insp.passed{background:#d4e8dc}
+.chk{display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap}
+.chk input{width:20px;height:20px;accent-color:var(--accent)}
+.row.done .lbl{text-decoration:line-through;text-decoration-color:var(--accent);text-decoration-thickness:2px}
+body.editing .row:not(.hdr):not(.insp),body.editing .cols{grid-template-columns:minmax(180px,2.2fr) 1fr 1fr 1fr 1.3fr 1fr .6fr 30px}
+body.editing .cols::after{content:""}
+.edit-only{display:none}
+body.editing .edit-only{display:inline-flex}
+body.editing .view-only{display:none}
+.x{border:0;background:var(--warn-soft);color:var(--warn);border-radius:8px;width:30px;height:30px;cursor:pointer;align-items:center;justify-content:center}
+.addbar{padding:10px 12px;gap:6px;flex-wrap:wrap}
+.totals .tr{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #efebe2;gap:10px}
+.totals .tr:last-child{border:0;font-weight:800;font-size:17px}
+.totals .tr .amt{font-variant-numeric:tabular-nums;font-weight:700}
+.fee{display:flex;gap:6px;align-items:center}
+.fee select{border:1px solid var(--line);border-radius:9px;padding:8px;background:#fff}
+.fee input{width:120px}
+.mlbl{display:none}
+.hint{font-size:12px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:20}
+.toast.show{opacity:1}
+
+/* Phones: each line item becomes a compact card */
+@media (max-width:760px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .stat .v{font-size:16px}
+  .cols{display:none}
+  .row{grid-template-columns:1fr 1fr;gap:6px 8px;padding:10px 12px}
+  .row .lbl{grid-column:1/-1;display:flex;align-items:center;gap:8px}
+  .row .cell{display:flex;flex-direction:column}
+  .mlbl{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+  .row .diff{text-align:left;padding:7px 0}
+  .row .xcell{grid-column:1/-1;justify-content:flex-end}
+  .row.insp{grid-template-columns:1fr 1fr}
+  .row.hdr{grid-template-columns:1fr auto}
+  .row.hdr .lbl{grid-column:auto}
+  body.editing .row:not(.hdr):not(.insp){grid-template-columns:1fr 1fr}
+}
+@media print{
+  .toolbar,.summary .bar,.x,.addbar,.btn{display:none!important}
+  .summary{position:static}
+  details.phase{break-inside:auto}
+  header.top{background:#fff;color:#000}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap" style="padding-bottom:0">
+    <h1 id="title">House Budget</h1>
+    <div class="sub">Cost Estimate Worksheet / Progress Chart</div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="summary">
+    <div class="stats">
+      <div class="stat"><div class="k">Total Estimate</div><div class="v" id="sEst">$0</div></div>
+      <div class="stat"><div class="k">Paid to Date</div><div class="v" id="sPaid">$0</div></div>
+      <div class="stat"><div class="k">Left to Pay</div><div class="v" id="sLeft">$0</div></div>
+      <div class="stat"><div class="k">Over / Under</div><div class="v" id="sDiff">$0</div></div>
+    </div>
+    <div class="bar"><i id="sBar"></i></div>
+    <div class="hint" id="sNote" style="margin-top:4px"></div>
+  </div>
+
+  <div class="card proj">
+    <label class="f">Project Name<input class="t" data-proj="name" placeholder="e.g. Our custom home"></label>
+    <label class="f">Owner(s)<input class="t" data-proj="owner" placeholder="Owner names"></label>
+    <label class="f">Address<input class="t" data-proj="address" placeholder="Build site address"></label>
+    <label class="f">Builder / GC<input class="t" data-proj="builder" placeholder="Builder or general contractor"></label>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn" id="btnExpand">Expand all</button>
+    <button class="btn" id="btnEdit">Edit line items</button>
+    <button class="btn" id="btnCsv">Export CSV</button>
+    <button class="btn" id="btnSave">Backup file</button>
+    <button class="btn" id="btnLoad">Restore backup</button>
+    <button class="btn" id="btnPrint">Print</button>
+    <button class="btn danger" id="btnReset">Start over</button>
+    <input type="file" id="fileIn" accept="application/json,.json" hidden>
+  </div>
+
+  <div id="phases"></div>
+
+  <div class="card totals">
+    <div class="tr"><span>Materials and Cost</span><span class="amt" id="tMat">$0.00</span></div>
+    <div class="tr"><span>Builder Fee</span>
+      <span class="fee">
+        <select id="feeMode"><option value="amt">$</option><option value="pct">%</option></select>
+        <input class="t num" id="feeVal" type="number" inputmode="decimal" step="0.01" placeholder="0">
+        <span class="amt" id="tFee">$0.00</span>
+      </span>
+    </div>
+    <div class="tr"><span>Total Est. Cost</span><span class="amt" id="tTot">$0.00</span></div>
+  </div>
+  <p class="hint">Everything saves automatically on this device. Use “Backup file” to move it to another phone or share with someone.</p>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+const KEY='housebudget.v1';
+// Template from the cost estimate worksheet.  #=section header  >=sub item  !=inspection
+const TEMPLATE=[
+ ['Phase 1',['#Plans','Site Plan/Zoning Verification/Review','Flood Elevation Plan','Site Plan/House Stake','Erosion Control Plan','Builders Risk','PC Permits and Fees','Environmental Health/Septic','LDP',
+  '#Pre Construction','Permit Box','Grading and Clearing','Dumpster Fees','Construction Entrance','Gravel and Mat','Silt Fence','Pad','!Site',
+  'Port-a-Potty','Temporary Electric/Infrastructure','Foundation Survey','Building Permit/Fees','Foundation Materials','Foundation Box Set','Under Slab Plumbing','!Under Slab',
+  'Foundation Prep','Termite','Concrete Slab','>Materials','>Labor','!Foundation','Back Fill','Dumpster','Job Site Clean Up']],
+ ['Phase 2',['Framing/Truss Package','>Labor','Roofing Package','>Labor','!Nail Pattern','Door and Window Package',
+  '#Exterior','Patio','Exterior Vapor Wrap','>Labor','!Wrap','Siding/Cornice/Fascia/Vent','>Brick','>Brick Labor','>Stucco/Labor','Siding/Cornice/Fascia/Vent','>Labor',
+  '#Pre Insulation','!Pre Insulation','Plumbing','HVAC','Electrical','Fire Place','Low Voltage','Gas Lines','!Mechanical/Framing','Insulation','!Insulation','Dumpster/Clean Up']],
+ ['Phase 3',['Drywall','Interior Trim Package','>Labor','Paint','Cabinets','Counter Tops','Flooring/Wall Tile/Labor','Flooring','Electrical Trim','Light Package','HVAC Trim','Plumbing Trim','Low Voltage Trim',
+  'Garage Doors','Specialties','Gutters','Driveway','Temporary Electric','!Temp Power','Appliances','Rough Clean','Landscaping','Pressure Wash','Systems Walk Through','!Final/CO']],
+ ['Phase 4',['Final Punch-out','Customer Walk Through','Final Clean','Final Paint','Delivery','Warranty','Closing']]
+];
+let uid=0;const id=()=>Date.now().toString(36)+(uid++).toString(36);
+function mkRow(s){
+  if(s[0]==='#')return{id:id(),type:'header',label:s.slice(1)};
+  if(s[0]==='!')return{id:id(),type:'insp',label:s.slice(1),passed:false,date:''};
+  const sub=s[0]==='>';return{id:id(),type:'item',sub,label:sub?s.slice(1):s,pct:'',est:'',paid:'',vendor:'',date:''};
+}
+function fresh(){return{proj:{name:'',owner:'',address:'',builder:''},fee:{mode:'amt',val:''},open:[0],
+  phases:TEMPLATE.map(([name,rows])=>({id:id(),name,rows:rows.map(mkRow)}))};}
+let S;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.phases)S=fresh();
+let saveT;const flush=()=>{clearTimeout(saveT);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+function save(){clearTimeout(saveT);saveT=setTimeout(flush,200)}
+addEventListener('pagehide',flush);document.addEventListener('visibilitychange',()=>{if(document.hidden)flush()});
+
+const $=s=>document.querySelector(s);
+const n=v=>{const x=parseFloat(v);return isFinite(x)?x:0};
+const fmt=v=>(v<0?'-':'')+'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt0=v=>(v<0?'-':'')+'$'+Math.abs(Math.round(v)).toLocaleString('en-US');
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let editing=false;
+
+function rowHTML(p,r){
+  const del=`<button class="x edit-only" data-del="${r.id}" title="Remove">✕</button>`;
+  const lbl=editing?`<input class="t" data-k="label" value="${esc(r.label)}">`:esc(r.label);
+  if(r.type==='header')return`<div class="row hdr" data-r="${r.id}"><span class="lbl">${lbl}</span>${del}</div>`;
+  if(r.type==='insp')return`<div class="row insp ${r.passed?'passed':''}" data-r="${r.id}">
+    <span class="lbl">🔍 Inspection: ${lbl}</span>
+    <label class="chk"><input type="checkbox" data-k="passed" ${r.passed?'checked':''}> Passed</label>
+    <span class="cell"><span class="mlbl">Date</span><input class="t" type="date" data-k="date" value="${esc(r.date)}"></span>
+    <span class="xcell" style="display:flex">${del}</span></div>`;
+  const d=n(r.est)-n(r.paid),has=r.est!==''||r.paid!=='';
+  const done=n(r.pct)>=100;
+  return`<div class="row ${r.sub?'sub':''} ${done?'done':''}" data-r="${r.id}">
+    <span class="lbl">${lbl}</span>
+    <span class="cell"><span class="mlbl">Estimate</span><input class="t num" type="number" inputmode="decimal" step="0.01" data-k="est" value="${esc(r.est)}" placeholder="0.00"></span>
+    <span class="cell"><span class="mlbl">Actual Paid</span><input class="t num" type="number" inputmode="decimal" step="0.01" data-k="paid" value="${esc(r.paid)}" placeholder="0.00"></span>
+    <span class="cell"><span class="mlbl">Difference</span><span class="diff ${has?(d<0?'neg':'pos'):''}" data-diff>${has?fmt(d):'—'}</span></span>
+    <span class="cell"><span class="mlbl">Vendor</span><input class="t" data-k="vendor" value="${esc(r.vendor)}" placeholder="Vendor"></span>
+    <span class="cell"><span class="mlbl">Date Complete</span><input class="t" type="date" data-k="date" value="${esc(r.date)}"></span>
+    <span class="cell"><span class="mlbl">% Done</span><input class="t num" type="number" inputmode="numeric" min="0" max="100" data-k="pct" value="${esc(r.pct)}" placeholder="%"></span>
+    ${editing?`<span class="xcell" style="display:flex">${del}</span>`:''}
+  </div>`;
+}
+function phaseTot(p){let e=0,pd=0,ins=0,pass=0;for(const r of p.rows){if(r.type==='item'){e+=n(r.est);pd+=n(r.paid)}else if(r.type==='insp'){ins++;if(r.passed)pass++}}return{e,pd,ins,pass}}
+function render(){
+  document.body.classList.toggle('editing',editing);
+  $('#btnEdit').classList.toggle('on',editing);$('#btnEdit').textContent=editing?'Done editing':'Edit line items';
+  $('#phases').innerHTML=S.phases.map((p,i)=>{
+    const t=phaseTot(p);
+    return`<details class="phase" data-p="${p.id}" ${S.open.includes(i)?'open':''}>
+    <summary><span class="chev">▶</span>
+      ${editing?`<input class="t" data-pname style="max-width:200px" value="${esc(p.name)}" onclick="event.preventDefault()">`:`<span class="pname">${esc(p.name)}</span>`}
+      <span class="ptot" data-ptot><b>${fmt0(t.e)}</b> est · ${fmt0(t.pd)} paid${t.ins?` · ${t.pass}/${t.ins} insp.`:''}</span>
+    </summary>
+    <div class="cols"><span>Item</span><span class="num">Estimate</span><span class="num">Actual Paid</span><span class="num">Difference</span><span>Vendor</span><span>Date Complete</span><span class="num">%</span></div>
+    ${p.rows.map(r=>rowHTML(p,r)).join('')}
+    <div class="addbar edit-only">
+      <button class="btn" data-add="item">+ Line item</button>
+      <button class="btn" data-add="sub">+ Sub item</button>
+      <button class="btn" data-add="insp">+ Inspection</button>
+      <button class="btn" data-add="header">+ Section</button>
+      ${S.phases.length>1?`<button class="btn danger" data-delphase>Remove phase</button>`:''}
+    </div></details>`}).join('')+
+    (editing?`<button class="btn" id="addPhase" style="margin:6px 0">+ Add phase</button>`:'');
+  for(const el of document.querySelectorAll('[data-proj]'))el.value=S.proj[el.dataset.proj]||'';
+  $('#feeMode').value=S.fee.mode;$('#feeVal').value=S.fee.val;
+  totals();
+}
+function totals(){
+  let e=0,pd=0,ins=0,pass=0,items=0,doneN=0;
+  for(const p of S.phases){const t=phaseTot(p);e+=t.e;pd+=t.pd;ins+=t.ins;pass+=t.pass;
+    for(const r of p.rows)if(r.type==='item'){items++;if(n(r.pct)>=100)doneN++}
+    const el=document.querySelector(`[data-p="${p.id}"] [data-ptot]`);
+    if(el)el.innerHTML=`<b>${fmt0(t.e)}</b> est · ${fmt0(t.pd)} paid${t.ins?` · ${t.pass}/${t.ins} insp.`:''}`;}
+  const fee=S.fee.mode==='pct'?e*n(S.fee.val)/100:n(S.fee.val);
+  const tot=e+fee;
+  $('#tMat').textContent=fmt(e);$('#tFee').textContent=fmt(fee);$('#tTot').textContent=fmt(tot);
+  $('#sEst').textContent=fmt0(tot);$('#sPaid').textContent=fmt0(pd);
+  $('#sLeft').textContent=fmt0(Math.max(tot-pd,0));
+  // Over/under only counts items that have been paid on
+  let ou=0;for(const p of S.phases)for(const r of p.rows)if(r.type==='item'&&r.paid!=='')ou+=n(r.est)-n(r.paid);
+  const sd=$('#sDiff');sd.textContent=(ou>0?'+':'')+fmt0(ou);sd.style.color=ou<0?'var(--warn)':ou>0?'var(--accent)':'';
+  $('#sBar').style.width=(tot>0?Math.min(pd/tot*100,100):0)+'%';
+  $('#sNote').textContent=`${tot>0?Math.round(pd/tot*100):0}% paid · ${doneN}/${items} items complete · ${pass}/${ins} inspections passed`;
+  const nm=S.proj.name.trim();$('#title').textContent=nm||'House Budget';document.title=nm?nm+' · Budget':'House Budget';
+}
+function findRow(rid){for(const p of S.phases){const i=p.rows.findIndex(r=>r.id===rid);if(i>-1)return{p,i,r:p.rows[i]}}}
+
+document.addEventListener('input',ev=>{
+  const t=ev.target;
+  if(t.dataset.proj){S.proj[t.dataset.proj]=t.value;save();totals();return}
+  if(t.id==='feeVal'){S.fee.val=t.value;save();totals();return}
+  if(t.dataset.pname!==undefined){S.phases.find(p=>p.id===t.closest('[data-p]').dataset.p).name=t.value;save();return}
+  const rowEl=t.closest('[data-r]');if(!rowEl||!t.dataset.k)return;
+  const {r}=findRow(rowEl.dataset.r);const k=t.dataset.k;
+  r[k]=t.type==='checkbox'?t.checked:t.value;
+  if(k==='passed'){rowEl.classList.toggle('passed',t.checked);if(t.checked&&!r.date){r.date=new Date().toISOString().slice(0,10);rowEl.querySelector('[data-k=date]').value=r.date}}
+  if(k==='pct')rowEl.classList.toggle('done',n(r.pct)>=100);
+  if(k==='est'||k==='paid'){const d=n(r.est)-n(r.paid),has=r.est!==''||r.paid!=='';const el=rowEl.querySelector('[data-diff]');
+    el.textContent=has?fmt(d):'—';el.className='diff '+(has?(d<0?'neg':'pos'):'');}
+  save();totals();
+});
+document.addEventListener('change',ev=>{if(ev.target.id==='feeMode'){S.fee.mode=ev.target.value;save();totals()}});
+document.addEventListener('toggle',ev=>{
+  if(!ev.target.matches||!ev.target.matches('details.phase'))return;
+  const i=[...document.querySelectorAll('details.phase')].indexOf(ev.target);
+  S.open=S.open.filter(x=>x!==i);if(ev.target.open)S.open.push(i);save();
+},true);
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest('button');if(!t)return;
+  if(t.dataset.del){const f=findRow(t.dataset.del);if(f&&(f.r.type!=='item'||(!f.r.est&&!f.r.paid)||confirm(`Remove "${f.r.label}"?`))){f.p.rows.splice(f.i,1);save();render()}return}
+  if(t.dataset.add){const p=S.phases.find(p=>p.id===t.closest('[data-p]').dataset.p);
+    const name=prompt(t.dataset.add==='insp'?'Inspection name':t.dataset.add==='header'?'Section name':'Item name');if(!name)return;
+    p.rows.push(mkRow((t.dataset.add==='insp'?'!':t.dataset.add==='header'?'#':t.dataset.add==='sub'?'>':'')+name));save();render();return}
+  if(t.dataset.delphase!==undefined){const i=S.phases.findIndex(p=>p.id===t.closest('[data-p]').dataset.p);
+    if(confirm(`Remove ${S.phases[i].name} and everything in it?`)){S.phases.splice(i,1);S.open=[];save();render()}return}
+  if(t.id==='addPhase'){S.phases.push({id:id(),name:'Phase '+(S.phases.length+1),rows:[]});S.open.push(S.phases.length-1);save();render();return}
+});
+$('#btnEdit').onclick=()=>{editing=!editing;render()};
+$('#btnExpand').onclick=()=>{const all=S.open.length<S.phases.length;S.open=all?S.phases.map((_,i)=>i):[];$('#btnExpand').textContent=all?'Collapse all':'Expand all';render()};
+$('#btnPrint').onclick=()=>{document.querySelectorAll('details.phase').forEach(d=>d.open=true);setTimeout(()=>print(),50)};
+$('#btnReset').onclick=()=>{if(confirm('Clear every value and go back to the blank worksheet? Make a backup first if you want to keep anything.')){S=fresh();editing=false;save();render();toast('Reset to blank')}};
+function download(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+const stamp=()=>new Date().toISOString().slice(0,10);
+$('#btnSave').onclick=()=>{download(`house-budget-${stamp()}.json`,JSON.stringify(S,null,1),'application/json');toast('Backup saved')};
+$('#btnLoad').onclick=()=>$('#fileIn').click();
+$('#fileIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;
+  try{const d=JSON.parse(await f.text());if(!d.phases)throw 0;if(confirm('Replace everything here with this backup?')){S=d;S.open=S.open||[0];save();render();toast('Backup restored')}}
+  catch(err){alert("That file doesn't look like a House Budget backup.")}e.target.value=''};
+$('#btnCsv').onclick=()=>{
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const L=[['Phase','Item','Type','%','Estimate','Actual Paid','Difference','Vendor','Date Complete / Passed'].map(q).join(',')];
+  for(const p of S.phases)for(const r of p.rows){
+    if(r.type==='header')L.push([p.name,r.label,'Section'].map(q).join(','));
+    else if(r.type==='insp')L.push([p.name,r.label,'Inspection','','','','',r.passed?'Passed':'',r.date].map(q).join(','));
+    else L.push([p.name,(r.sub?'  ':'')+r.label,r.sub?'Sub item':'Item',r.pct,r.est,r.paid,(r.est!==''||r.paid!=='')?(n(r.est)-n(r.paid)).toFixed(2):'',r.vendor,r.date].map(q).join(','));}
+  let e=0;S.phases.forEach(p=>e+=phaseTot(p).e);const fee=S.fee.mode==='pct'?e*n(S.fee.val)/100:n(S.fee.val);
+  L.push('',[ '','Materials and Cost','','',e.toFixed(2)].map(q).join(','),['','Builder Fee','','',fee.toFixed(2)].map(q).join(','),['','Total Est. Cost','','',(e+fee).toFixed(2)].map(q).join(','));
+  download(`house-budget-${stamp()}.csv`,L.join('\n'),'text/csv');toast('CSV exported')};
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1800)}
+render();
+})();
+</script>
+</body>
+</html>
