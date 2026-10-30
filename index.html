@@ -51,6 +51,9 @@ details[open] .chev{transform:rotate(90deg)}
 .row{border-bottom:1px solid #efebe2}
 .row:last-child{border-bottom:0}
 .row .lbl{font-weight:500}
+.note{display:block;font-weight:400;font-size:12px;color:var(--muted);line-height:1.3;margin-top:2px}
+.note-in{margin-top:4px;font-size:12px!important}
+.row .lbl>span{flex:1;min-width:0}
 .row.sub .lbl{padding-left:18px;color:#3b4740}
 .row.sub .lbl::before{content:"↳ ";color:var(--muted)}
 .row .t{padding:7px 8px;font-size:14px}
@@ -143,7 +146,7 @@ body.editing .view-only{display:none}
   <div class="wrap" style="padding-bottom:0">
     <button class="syncpill" id="syncPill" type="button"><span class="dot"></span><span id="syncTxt">Sync off</span></button>
     <h1 id="title">House Budget</h1>
-    <div class="sub">Cost Estimate Worksheet / Progress Chart</div>
+    <div class="sub">40×60 Barndominium · 2,400 sf + 1,642 sf loft · 2,100 sf porches</div>
     <nav class="tabs"><button class="tab active" data-tab="budget">💲 Budget</button><button class="tab" data-tab="steps">🪜 Build Steps</button></nav>
   </div>
 </header>
@@ -210,29 +213,127 @@ body.editing .view-only{display:none}
 (function(){
 const KEY='housebudget.v1';
 // Template from the cost estimate worksheet.  #=section header  >=sub item  !=inspection
+const TEMPLATE_VERSION=2;
+// Line items for the 40×60 Barndominium plan set (Rev 0, Oct 27 2026).
+// #=section header  >=sub item  !=inspection  'Label|note' = plan detail shown under the item
 const TEMPLATE=[
- ['Phase 1',['#Plans','Site Plan/Zoning Verification/Review','Flood Elevation Plan','Site Plan/House Stake','Erosion Control Plan','Builders Risk','PC Permits and Fees','Environmental Health/Septic','LDP',
-  '#Pre Construction','Permit Box','Grading and Clearing','Dumpster Fees','Construction Entrance','Gravel and Mat','Silt Fence','Pad','!Site',
-  'Port-a-Potty','Temporary Electric/Infrastructure','Foundation Survey','Building Permit/Fees','Foundation Materials','Foundation Box Set','Under Slab Plumbing','!Under Slab',
-  'Foundation Prep','Termite','Concrete Slab','>Materials','>Labor','!Foundation','Back Fill','Dumpster','Job Site Clean Up']],
- ['Phase 2',['Framing/Truss Package','>Labor','Roofing Package','>Labor','!Nail Pattern','Door and Window Package',
-  '#Exterior','Patio','Exterior Vapor Wrap','>Labor','!Wrap','Siding/Cornice/Fascia/Vent','>Brick','>Brick Labor','>Stucco/Labor','Siding/Cornice/Fascia/Vent','>Labor',
-  '#Pre Insulation','!Pre Insulation','Plumbing','HVAC','Electrical','Fire Place','Low Voltage','Gas Lines','!Mechanical/Framing','Insulation','!Insulation','Dumpster/Clean Up']],
- ['Phase 3',['Drywall','Interior Trim Package','>Labor','Paint','Cabinets','Counter Tops','Flooring/Wall Tile/Labor','Flooring','Electrical Trim','Light Package','HVAC Trim','Plumbing Trim','Low Voltage Trim',
-  'Garage Doors','Specialties','Gutters','Driveway','Temporary Electric','!Temp Power','Appliances','Rough Clean','Landscaping','Pressure Wash','Systems Walk Through','!Final/CO']],
- ['Phase 4',['Final Punch-out','Customer Walk Through','Final Clean','Final Paint','Delivery','Warranty','Closing']]
+ ['Phase 1 · Plans, Site & Slab',[
+  '#Plans & Engineering',
+  'Permit-ready plan set|Prelim set Rev 0 (Oct 27, 2026) needs to be finished to the IRC as adopted by the county',
+  "Engineer's stamp|Loft floor (40 psf live), LVL beam B1, porch glulams, porch ledgers bearing on steel",
+  'Stamped steel building drawings|From the metal-building supplier; most GA counties want these',
+  'Site plan / zoning verification','Flood elevation plan','Erosion control plan','Builders risk insurance','PC permits and fees',
+  'Environmental Health / septic|3 bedrooms, 2½ baths','LDP (land disturbance permit)',
+  '#Site Prep',
+  'Permit box','Grading and clearing','Construction entrance — gravel and mat','Silt fence',
+  'Building pad|40×60 building + 20′ side porch + 15′ front porch',
+  '!Site',
+  'Dumpster fees','Port-a-potty','Temporary electric','Foundation survey / house stake|Stake the 40′×60′ steel line',
+  'Building permit / fees',
+  '#Slab & Footings',
+  'Under-slab plumbing|Master bath, hall bath, ½ bath, kitchen + island, laundry',
+  '!Under Slab',
+  'Foundation prep|Gravel, vapor barrier, rebar; thickened footings under IW-1, IW-2 and side walls (12″ deep × 18–24″)',
+  'Steel column piers / anchor bolts|Per the steel building drawings',
+  'P1 post footing|24″×24″×12″ pad at the kitchen/den edge',
+  'Termite pre-treat',
+  'Concrete slab|2,400 sf main floor','>Materials','>Labor',
+  '!Foundation',
+  'Back fill','Job site clean up']],
+ ['Phase 2 · Shell, Framing & Rough-Ins',[
+  '#Steel Building',
+  'Steel building kit|40′×60′, 16′ eave, 2:12 roof, ±19′-4″ ridge; frame, girts, purlins, wall & roof panels, trim; continuous porch ledger girt + beam seats',
+  'Steel erection labor',
+  'Opening trim in panel color|353 LF of head / jamb / sill trim',
+  '#Wood Framing (21,948 bf · 1,436 pcs)',
+  'Wall lumber|647 studs + plates & headers; 2x6 exterior (to 18′-8½″ at the front gable), 2x4/2x6 interior',
+  'Loft floor package|111 2x12 SYP joists, 3-ply LVL beam B1, 6×6 post P1, 54 sheets ¾″ T&G OSB',
+  'Stair & guard|Straight stair, 3′-6″ wide, 16 risers; 3 stringers, 15 treads, 42″ guard (67 LF)',
+  'Ceiling strapping|145 2x4s @ 16″ under the steel purlins + 1,000 wood-to-steel screws',
+  'Hardware & fasteners|Anchor bolts, joist & rafter hangers, H2.5A ties, post bases, nails, adhesive',
+  'Framing labor',
+  '#Porches (2,100 sf)',
+  'Stone piers & footings|11 posts on 30″ stone-veneered piers with concrete cores',
+  'Porch slabs|Side 20′×75′ (outdoor kitchen/dining) · front 15′×40′',
+  'Porch timber package|11 8×8 PT posts, 2x12 beams, 89 2x12 rafters, glulam ridge/eave/tie beams, front truss timbers',
+  'Porch roof|Metal panels on 2x4 purlins (1,308 LF), 196 LF fascia',
+  'Porch ceiling|2,620 sf 1x6 T&G pine',
+  'Porch labor','Front steps|3 risers between the posts',
+  '!Framing',
+  '#Windows & Doors',
+  'Window package|20 units / 13 openings: 1 awning, 10 single-hung, 1 slider, 8 transoms; black frames; U ≤ 0.35, SHGC ≤ 0.27',
+  'Exterior doors|D-1 half-lite, D-2 full-lite, D-3 6′×8′ French pair + sidelites + 12′ transom',
+  'Install materials|Flashing tape, sill pans, low-expansion foam, shims',
+  'Window & door install labor',
+  '#Rough-Ins',
+  'Plumbing rough|2½ baths, kitchen + island, laundry, outdoor kitchen',
+  'HVAC rough|Main floor, loft and the vaulted den / nook',
+  'Electrical rough','Fireplace|Prefab unit + chase in the den','Low voltage','Gas lines',
+  '!Rough-In',
+  'Insulation|Steel walls & roof, loft knee walls, sound in bedroom walls',
+  '!Insulation',
+  'Dumpster / clean up']],
+ ['Phase 3 · Finishes',[
+  'Drywall|Includes vaulted den / nook ceilings up to 18′-11″',
+  'Interior doors|14 doors incl. two 5′ bifolds',
+  'Interior trim package|353 LF window/door casing, base, jamb extensions','>Labor',
+  'Paint',
+  'Cabinets|Kitchen (28′×15′ with island), baths, laundry',
+  'Counter tops',
+  'Flooring / wall tile / labor','Flooring',
+  'Stair treads & guard finish|Guard infill by owner',
+  'Electrical trim','Light package','HVAC trim','Plumbing trim','Low voltage trim',
+  'Appliances','Outdoor kitchen|Side porch',
+  'Specialties|Mirrors, shower doors, closet shelving, hardware',
+  'Gutters','Driveway','Permanent power',
+  '!Power Release',
+  'Rough clean','Landscaping','Pressure wash','Systems walk through',
+  '!Final/CO']],
+ ['Phase 4 · Closeout',['Final punch-out','Customer walk through','Final clean','Final paint','Delivery','Warranty','Closing']]
 ];
 let uid=0;const id=()=>Date.now().toString(36)+(uid++).toString(36);
 function mkRow(s){
   if(s[0]==='#')return{id:id(),type:'header',label:s.slice(1)};
   if(s[0]==='!')return{id:id(),type:'insp',label:s.slice(1),passed:false,date:''};
-  const sub=s[0]==='>';return{id:id(),type:'item',sub,label:sub?s.slice(1):s,pct:'',est:'',paid:'',vendor:'',date:''};
+  const sub=s[0]==='>';const [label,note]=(sub?s.slice(1):s).split('|');
+  return{id:id(),type:'item',sub,label,note:note||'',pct:'',est:'',paid:'',vendor:'',date:''};
 }
-function fresh(){return{steps:{},tab:'budget',proj:{name:'',owner:'',address:'',builder:''},fee:{mode:'amt',val:''},open:[0],
+function fresh(){return{tv:TEMPLATE_VERSION,steps:{},tab:'budget',proj:{name:'',owner:'',address:'',builder:''},fee:{mode:'amt',val:''},open:[0],
   phases:TEMPLATE.map(([name,rows])=>({id:id(),name,rows:rows.map(mkRow)}))};}
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||!S.phases)S=fresh();
+// Move older saved budgets onto the plan-specific list, keeping anything already entered
+const ALIAS={'termite':'termite pre-treat','ldp':'ldp (land disturbance permit)','site plan / zoning verification / review':'site plan / zoning verification',
+ 'construction entrance':'construction entrance — gravel and mat','fondation survey':'foundation survey / house stake','site plan / house stake':'foundation survey / house stake',
+ 'port-a potty':'port-a-potty','temporary electric / infrastructure':'temporary electric','tempoary electric':'permanent power',
+ 'framing / truss package':'wall lumber','framing / truss package — labor':'framing labor','door and window package':'window package',
+ 'fire place':'fireplace','plumbing':'plumbing rough','hvac':'hvac rough','electrical':'electrical rough','pad':'building pad',
+ 'roofing package':'steel building kit','roofing package — labor':'steel erection labor','dumpster':'job site clean up','pc permits and fees':'pc permits and fees'};
+const normK=t=>String(t||'').toLowerCase().replace(/\s*\/\s*/g,' / ').replace(/\s+/g,' ').trim();
+function migrate(st){
+  if(!st||st.tv===TEMPLATE_VERSION)return st;
+  const has=r=>r.est!==''||r.paid!==''||r.vendor||r.date||r.pct!=='';
+  const old=[],insp={};let p3=false;
+  for(const p of st.phases||[]){let parent='';p3=/3/.test(p.name);for(const r of p.rows){
+    if(r.type==='insp'){if(r.passed||r.date)insp[normK(r.label)]=r;continue}
+    if(r.type!=='item')continue;if(!r.sub)parent=r.label;
+    const full=r.sub?parent+' — '+r.label:r.label;let k=normK(full);
+    if(p3&&k==='temporary electric')k='tempoary electric';
+    if(has(r))old.push({...r,key:ALIAS[k]||k,full,used:false});}}
+  const nf=fresh();nf.proj=st.proj||nf.proj;nf.fee=st.fee||nf.fee;nf.steps=st.steps||{};nf.tab=st.tab||'budget';
+  const copy=(r,o)=>{for(const k of['est','paid','vendor','date','pct'])r[k]=o[k]??''};
+  for(const p of nf.phases){let parent='';for(const r of p.rows){
+    if(r.type==='insp'){const o=insp[normK(r.label)];if(o){r.passed=o.passed;r.date=o.date}continue}
+    if(r.type!=='item')continue;if(!r.sub)parent=r.label;
+    const k=normK(r.sub?parent+' — '+r.label:r.label);
+    const o=old.find(o=>!o.used&&o.key===k);if(o){o.used=true;copy(r,o)}}}
+  const left=old.filter(o=>!o.used);
+  if(left.length){const last=nf.phases[nf.phases.length-1];last.rows.push(mkRow('#Carried over from the first list'));
+    for(const o of left){const r=mkRow(o.full);copy(r,o);last.rows.push(r)}}
+  return nf;
+}
+if(S.tv!==TEMPLATE_VERSION){S=migrate(S);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 let saveT;const flush=()=>{clearTimeout(saveT);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 let onSave=null;
 function save(){clearTimeout(saveT);saveT=setTimeout(flush,200);if(onSave)onSave()}
@@ -248,6 +349,7 @@ let editing=false;
 function rowHTML(p,r){
   const del=`<button class="x edit-only" data-del="${r.id}" title="Remove">✕</button>`;
   const lbl=editing?`<input class="t" data-k="label" value="${esc(r.label)}">`:esc(r.label);
+  const noteH=r.type!=='item'?'':editing?`<input class="t note-in" data-k="note" value="${esc(r.note||'')}" placeholder="Plan note">`:(r.note?`<span class="note">${esc(r.note)}</span>`:'');
   if(r.type==='header')return`<div class="row hdr" data-r="${r.id}"><span class="lbl">${lbl}</span>${del}</div>`;
   if(r.type==='insp')return`<div class="row insp ${r.passed?'passed':''}" data-r="${r.id}">
     <span class="lbl">🔍 Inspection: ${lbl}</span>
@@ -257,7 +359,7 @@ function rowHTML(p,r){
   const d=n(r.est)-n(r.paid),has=r.est!==''||r.paid!=='';
   const done=n(r.pct)>=100;
   return`<div class="row ${r.sub?'sub':''} ${done?'done':''}" data-r="${r.id}">
-    <span class="lbl">${lbl}</span>
+    <span class="lbl"><span>${lbl}${noteH}</span></span>
     <span class="cell"><span class="mlbl">Estimate</span><input class="t num" type="number" inputmode="decimal" step="0.01" data-k="est" value="${esc(r.est)}" placeholder="0.00"></span>
     <span class="cell"><span class="mlbl">Actual Paid</span><input class="t num" type="number" inputmode="decimal" step="0.01" data-k="paid" value="${esc(r.paid)}" placeholder="0.00"></span>
     <span class="cell"><span class="mlbl">Difference</span><span class="diff ${has?(d<0?'neg':'pos'):''}" data-diff>${has?fmt(d):'—'}</span></span>
@@ -355,11 +457,11 @@ $('#fileIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;
   catch(err){alert("That file doesn't look like a House Budget backup.")}e.target.value=''};
 $('#btnCsv').onclick=()=>{
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
-  const L=[['Phase','Item','Type','%','Estimate','Actual Paid','Difference','Vendor','Date Complete / Passed'].map(q).join(',')];
+  const L=[['Phase','Item','Type','%','Estimate','Actual Paid','Difference','Vendor','Date Complete / Passed','Plan Note'].map(q).join(',')];
   for(const p of S.phases)for(const r of p.rows){
     if(r.type==='header')L.push([p.name,r.label,'Section'].map(q).join(','));
     else if(r.type==='insp')L.push([p.name,r.label,'Inspection','','','','',r.passed?'Passed':'',r.date].map(q).join(','));
-    else L.push([p.name,(r.sub?'  ':'')+r.label,r.sub?'Sub item':'Item',r.pct,r.est,r.paid,(r.est!==''||r.paid!=='')?(n(r.est)-n(r.paid)).toFixed(2):'',r.vendor,r.date].map(q).join(','));}
+    else L.push([p.name,(r.sub?'  ':'')+r.label,r.sub?'Sub item':'Item',r.pct,r.est,r.paid,(r.est!==''||r.paid!=='')?(n(r.est)-n(r.paid)).toFixed(2):'',r.vendor,r.date,r.note||''].map(q).join(','));}
   let e=0;S.phases.forEach(p=>e+=phaseTot(p).e);const fee=S.fee.mode==='pct'?e*n(S.fee.val)/100:n(S.fee.val);
   L.push('',[ '','Materials and Cost','','',e.toFixed(2)].map(q).join(','),['','Builder Fee','','',fee.toFixed(2)].map(q).join(','),['','Total Est. Cost','','',(e+fee).toFixed(2)].map(q).join(','));
   download(`house-budget-${stamp()}.csv`,L.join('\n'),'text/csv');toast('CSV exported')};
@@ -367,87 +469,96 @@ function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');cl
 // ---------- Build Steps (order of construction) ----------
 // '!' = inspection gate (label matches the Budget tab inspection)
 const STEPS=[
- ['Plans & Permits','Get approvals lined up before anyone touches dirt',[
-  ['Finalize house plans & budget','Lock the floor plan and fill in estimates on the Budget tab'],
-  ['Site plan / zoning verification','Confirm setbacks, lot coverage and zoning with the county'],
-  ['Flood elevation plan','Only if the lot is in or near a flood zone'],
-  ['Erosion control plan','Required for the land disturbance permit'],
-  ['Environmental Health / septic permit','Perc/soil test and septic layout approval'],
-  ['LDP (Land Disturbance Permit)','Lets you start clearing and grading'],
-  ['Builders risk insurance','Have coverage in place before work and materials arrive'],
-  ['Pre-construction permits & fees','Pay county PC permits and impact/plan fees']]],
- ['Site Prep','Get the lot ready for a foundation',[
-  ['Permit box posted','Permits must be on display at the road'],
-  ['Construction entrance — gravel & mat','Keeps mud off the road'],
-  ['Silt fence','Install erosion control before grading'],
-  ['Clearing & grading','Trees, stumps and rough grade'],
-  ['Dumpster & port-a-potty','Set before crews arrive'],
-  ['Building pad','Bring in and compact fill for the slab'],
-  ['!Site','Erosion control / site inspection'],
-  ['Temporary electric','Temp pole and power for the crews'],
-  ['House stake & foundation survey','Surveyor marks the exact footprint'],
-  ['Building permit','Pull the building permit and pay fees']]],
- ['Foundation','Everything under and in the slab',[
-  ['Foundation materials & box set','Forms set for the slab and footings'],
-  ['Under-slab plumbing','Drains and supply lines in before the pour'],
-  ['!Under Slab','Plumbing inspection — pipes must be visible'],
-  ['Foundation prep','Gravel, vapor barrier, rebar/wire mesh'],
-  ['Termite pre-treat','Treat soil before the concrete goes down'],
+ ['Plans, Engineering & Permits','Turn the preliminary set into permit drawings and get approvals',[
+  ['Finalize the floor plan','Sign off on Rev 0 changes: straight stair, bedroom 2/3 closets, post P1, front porch posts, front wall'],
+  ['Order the steel building drawings','Give the supplier the rough openings, 16′ eave, 2:12 roof and the porch ledger girt + beam seats'],
+  ["Get the engineer's stamp",'Loft floor, LVL beam B1, porch beams/glulams and the porch loads on the steel frame'],
+  ['Choose window & door supplier','Decide nail-fin vs. block-frame units before ordering; ask for U ≤ 0.35, SHGC ≤ 0.27'],
+  ['Pick the fireplace unit','Chase framing depends on its specs'],
+  ['Price it out','Send the lumber order list, window list and steel quote out; fill in Budget estimates'],
+  ['Site plan / zoning verification','Setbacks and lot coverage for 40×60 + 2,100 sf of porches'],
+  ['Flood elevation & erosion control plans',''],
+  ['Septic permit','Perc test and system sized for 3 bedrooms'],
+  ['LDP (land disturbance permit)',''],
+  ['Builders risk insurance','In place before materials arrive'],
+  ['Pre-construction permits & fees','']]],
+ ['Site Prep','Get the lot ready for the slab',[
+  ['Permit box posted',''],
+  ['Construction entrance — gravel & mat',''],
+  ['Silt fence',''],
+  ['Clearing & grading',''],
+  ['Building pad','Pad big enough for the 40×60 plus the 20′ side porch and 15′ front porch'],
+  ['!Site','Site / erosion control inspection'],
+  ['Dumpster, port-a-potty & temporary electric',''],
+  ['Stake the house & foundation survey','Stake the 40′×60′ steel line, porch lines and pier locations'],
+  ['Building permit','']]],
+ ['Slab & Footings','Steel building slab with the loft bearing footings',[
+  ['Under-slab plumbing','Master bath, hall bath, ½ bath, kitchen + island sink, laundry; sleeves for the outdoor kitchen'],
+  ['!Under Slab','Plumbing inspection'],
+  ['Form slab & thickened footings','Under IW-1, IW-2 and the side walls (12″ × 18–24″); 24″×24″×12″ pad for post P1'],
+  ['Set anchor bolts / column piers','Exact layout from the steel drawings'],
+  ['Gravel, vapor barrier & rebar',''],
+  ['Termite pre-treat',''],
   ['!Foundation','Pre-pour inspection'],
-  ['Pour concrete slab','Materials and labor'],
-  ['Backfill','Fill in around the slab edges'],
-  ['Dumpster & job site clean up','']]],
- ['Dry-In','Frame it, roof it and close it up from the weather',[
-  ['Framing / truss package','Steel or wood frame and trusses go up'],
-  ['Roofing','Roof package and labor'],
-  ['!Nail Pattern','Sheathing / fastener inspection'],
-  ['Windows & exterior doors','Door and window package installed'],
-  ['Exterior vapor wrap','House wrap around the walls'],
-  ['!Wrap','Wrap inspection before siding covers it'],
-  ['Exterior finish','Siding, brick or stucco, soffit, fascia, vents'],
-  ['Patio / porch','Porch and patio structure']]],
- ['Rough-Ins','Everything that goes inside the walls',[
-  ['!Pre Insulation','Framing check before mechanicals'],
+  ['Pour the slab','2,400 sf'],
+  ['Backfill & clean up','']]],
+ ['Steel Shell','Get the building up and dried in',[
+  ['Steel building delivered','Check the kit against the drawings, including the porch ledger girt'],
+  ['Erect steel frame, girts & purlins',''],
+  ['Roof & wall panels','Building is dried in'],
+  ['Window & door openings framed in the girts','With trim in panel color']]],
+ ['Wood Framing','Everything inside the steel is wood',[
+  ['Exterior stud walls','2x6 @ 16″, PT plates on the slab; tie walls over 10′ (den, nook, front gable) to every girt line'],
+  ['Front gable wall (EW-6)','Tallest wall: French entry with sidelites, transoms and twin windows'],
+  ['Interior walls','IW-1 and IW-2 are bearing; 2x6 at plumbing walls'],
+  ['Loft floor','2x12 joists (12″ o.c. in the 16′ bay), LVL beam B1, post P1, ¾″ T&G glued & screwed'],
+  ['Loft knee walls & back gable',''],
+  ['Stair & 42″ guard','16 risers, 3′-6″ wide'],
+  ['Ceiling strapping','2x4 @ 16″ under the purlins'],
+  ['Blocking & backing','Fire blocking in tall walls; cabinet, TV, grab-bar backing; fireplace chase']]],
+ ['Porches','Timber wraparound porch',[
+  ['Pier footings & stone piers','11 piers, 30″ stone-veneered with concrete cores'],
+  ['Porch slabs','Side 20′×75′, front 15′×40′'],
+  ['Posts, beams & ledgers','8×8 PT posts on ABU88Z bases; 2-ply ledger on the steel ledger girt'],
+  ['Rafters & front truss','2x12 rafters @ 16″, glulam ridge / eave / tie beams'],
+  ['Purlins & metal roof',''],
+  ['!Framing','Framing inspection — walls, loft, stair, porches'],
+  ['Windows & exterior doors installed','Flashing tape, sill pans, foam']]],
+ ['Rough-Ins','Everything that goes in the walls',[
   ['Plumbing rough-in',''],
-  ['HVAC rough-in','Ducts, line sets and equipment pads'],
-  ['Electrical rough-in','Panel, boxes and wiring'],
-  ['Gas lines','If you have gas appliances'],
-  ['Fireplace','Install the unit and flue'],
-  ['Low voltage','Data, TV, cameras, speakers, alarm'],
-  ['!Mechanical/Framing','Rough-in inspection — all trades'],
-  ['Insulation','Walls and ceilings'],
-  ['!Insulation','Insulation inspection before drywall'],
-  ['Dumpster / clean up','']]],
- ['Interior & Exterior Finish','Make it a house',[
-  ['Drywall','Hang, tape and finish'],
-  ['Interior trim','Doors, base, casing and trim labor'],
-  ['Paint','Prime and paint before flooring'],
+  ['HVAC rough-in','Plan supply for the loft and the vaulted den/nook'],
+  ['Electrical rough-in',''],
+  ['Gas lines',''],
+  ['Fireplace',''],
+  ['Low voltage','Data, TV, cameras, speakers'],
+  ['!Rough-In','All trades'],
+  ['Insulation','Steel walls & roof, loft knee walls'],
+  ['!Insulation','Before drywall']]],
+ ['Finishes','Make it a house',[
+  ['Drywall','Vaulted den/nook ceilings up to 18′-11″'],
+  ['Interior doors & trim','14 doors, casing, base'],
+  ['Paint',''],
   ['Cabinets',''],
   ['Countertops','Template after cabinets are set'],
-  ['Wall tile & flooring','Tile, hardwood, LVP, carpet last'],
-  ['Electrical trim & light package','Switches, outlets and fixtures'],
-  ['Plumbing trim','Faucets, toilets and fixtures'],
-  ['HVAC trim','Registers, thermostat and startup'],
-  ['Low voltage trim',''],
-  ['Appliances',''],
-  ['Garage doors',''],
-  ['Specialties','Mirrors, shelving, shower doors, hardware'],
-  ['Gutters',''],
-  ['Driveway',''],
-  ['Permanent power','Switch from temp to permanent service'],
-  ['!Temp Power','Power release inspection'],
-  ['Rough clean',''],
-  ['Landscaping','Final grade, sod/seed and plants'],
-  ['Pressure wash',''],
+  ['Tile & flooring',''],
+  ['Stair treads & guard finish',''],
+  ['Porch ceiling','2,620 sf T&G pine'],
+  ['Electrical, plumbing, HVAC & low voltage trim',''],
+  ['Light package & appliances',''],
+  ['Outdoor kitchen',''],
+  ['Specialties','Mirrors, shower doors, closet shelving, hardware'],
+  ['Gutters & driveway',''],
+  ['Permanent power',''],
+  ['!Power Release',''],
+  ['Rough clean, landscaping & pressure wash',''],
   ['Systems walk-through','Test every system'],
-  ['!Final/CO','Final inspection — Certificate of Occupancy']]],
+  ['!Final/CO','Certificate of Occupancy']]],
  ['Closeout','Finish strong and move in',[
-  ['Final punch-out','List and fix every small issue'],
+  ['Final punch-out',''],
   ['Customer walk-through',''],
-  ['Final clean',''],
-  ['Final paint touch-ups',''],
+  ['Final clean & paint touch-ups',''],
   ['Closing','Final payments and paperwork'],
-  ['Warranty','Save warranty info and set up the 11-month walk-through'],
+  ['Warranty','Save warranty info; schedule the 11-month walk-through'],
   ['Move in! 🏡','']]]
 ];
 if(!S.steps)S.steps={};
@@ -533,9 +644,10 @@ function applyRemote(doc){
   if(typing()){pendingRemote=doc;return}
   let d;try{d=JSON.parse(doc.json)}catch(e){return}
   if(!d.phases)return;
-  S={...d,open:S.open||[0],tab:S.tab||'budget'};S.steps=S.steps||{};
+  const mig=d.tv!==TEMPLATE_VERSION;
+  S={...migrate(d),open:S.open||[0],tab:S.tab||'budget'};S.steps=S.steps||{};
   try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
-  lastPayload=payload();SY.lastAt=doc.at;SY.dirty=false;saveSY();rerender();
+  lastPayload=payload();SY.lastAt=doc.at;SY.dirty=false;saveSY();rerender();if(mig)onSave();
 }
 document.addEventListener('focusout',()=>setTimeout(()=>{if(pendingRemote&&!typing()){const d=pendingRemote;pendingRemote=null;applyRemote(d)}},60));
 onSave=()=>{if(!SY.code)return;const p=payload();if(p===lastPayload)return;
