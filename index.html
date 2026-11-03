@@ -70,6 +70,12 @@ details[open] .chev{transform:rotate(90deg)}
 body.editing .row:not(.hdr):not(.insp),body.editing .cols{grid-template-columns:minmax(180px,2.2fr) 1fr 1fr 1fr 1.3fr 1fr .6fr 30px}
 body.editing .cols::after{content:""}
 .edit-only{display:none}
+.subgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;padding:12px 14px}
+.subcard details.scope{padding:0 14px 8px}
+.subcard details.scope summary{cursor:pointer;font-size:13px;color:var(--accent);font-weight:600}
+.subcard ul{margin:6px 0;padding-left:18px;font-size:14px}.subcard li{margin:4px 0}
+.trade-sel{margin-top:4px;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:5px;background:#fff;max-width:100%}
+.tradetag{display:inline-block;margin-top:3px;font-size:11px;color:var(--gold);font-weight:600}
 header.top .wrap{position:relative}
 .syncpill{position:absolute;right:12px;top:0;display:flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#f4f1ea;border-radius:20px;padding:5px 11px;font-size:13px;cursor:pointer}
 .syncpill .dot{width:8px;height:8px;border-radius:50%;background:#9aa39d}
@@ -147,7 +153,7 @@ body.editing .view-only{display:none}
     <button class="syncpill" id="syncPill" type="button"><span class="dot"></span><span id="syncTxt">Sync off</span></button>
     <h1 id="title">House Budget</h1>
     <div class="sub">40×60 Barndominium · 2,400 sf + 1,642 sf loft · 2,100 sf porches</div>
-    <nav class="tabs"><button class="tab active" data-tab="budget">💲 Budget</button><button class="tab" data-tab="steps">🪜 Build Steps</button></nav>
+    <nav class="tabs"><button class="tab active" data-tab="budget">💲 Budget</button><button class="tab" data-tab="steps">🪜 Build Steps</button><button class="tab" data-tab="subs">👷 Subs</button></nav>
   </div>
 </header>
 <div class="wrap" id="syncWrap" style="padding-bottom:0" hidden><div class="card" id="syncPanel"></div></div>
@@ -160,6 +166,17 @@ body.editing .view-only{display:none}
   </div>
   <p class="hint">Work top to bottom. 🛑 Red rows are inspections. Don't start the next step until the inspection passes. Checking an inspection here also checks it on the Budget tab.</p>
   <div id="stepList"></div>
+</div>
+
+<div class="wrap" id="tabSubs" hidden>
+  <div class="card" style="margin-top:14px">
+    <h3 style="margin:0 0 4px">Subcontractor breakdown</h3>
+    <p class="hint" style="margin:0 0 10px">Every budget line is grouped by trade, with the scope pulled from your plans. Add each sub's info below, then make a PDF of everything or a scope sheet to send one sub. To move an item to a different trade, use Edit line items on the Budget tab.</p>
+    <label class="chk" style="margin-bottom:10px"><input type="checkbox" id="subsMoney" checked> Include my budget numbers</label>
+    <div class="row2"><button class="btn primary" id="btnSubsPdf">📄 PDF — all subs</button></div>
+    <p class="hint" style="margin:8px 0 0">Tip: uncheck budget numbers before making a scope sheet you'll send to a sub for bidding.</p>
+  </div>
+  <div id="subList"></div>
 </div>
 
 <div class="wrap" id="tabBudget">
@@ -226,7 +243,7 @@ const TEMPLATE=[
   'Environmental Health / septic|3 bedrooms, 2½ baths','LDP (land disturbance permit)',
   '#Site Prep',
   'Permit box','Grading and clearing','Construction entrance — gravel and mat','Silt fence',
-  'Building pad|40×60 building + 20′ side porch + 15′ front porch',
+  'Building pad|40×60 building + 15′ deep wraparound porches',
   '!Site',
   'Dumpster fees','Port-a-potty','Temporary electric','Foundation survey / house stake|Stake the 40′×60′ steel line',
   'Building permit / fees',
@@ -248,13 +265,13 @@ const TEMPLATE=[
   '#Wood Framing (21,948 bf · 1,436 pcs)',
   'Wall lumber|647 studs + plates & headers; 2x6 exterior (to 18′-8½″ at the front gable), 2x4/2x6 interior',
   'Loft floor package|111 2x12 SYP joists, 3-ply LVL beam B1, 6×6 post P1, 54 sheets ¾″ T&G OSB',
-  'Stair & guard|Straight stair, 3′-6″ wide, 16 risers; 3 stringers, 15 treads, 42″ guard (67 LF)',
+  'Stair & guard|L-shaped stair with landing, 3′-6″ wide; 42″ guard at the open loft',
   'Ceiling strapping|145 2x4s @ 16″ under the steel purlins + 1,000 wood-to-steel screws',
   'Hardware & fasteners|Anchor bolts, joist & rafter hangers, H2.5A ties, post bases, nails, adhesive',
   'Framing labor',
   '#Porches (2,100 sf)',
   'Stone piers & footings|11 posts on 30″ stone-veneered piers with concrete cores',
-  'Porch slabs|Side 20′×75′ (outdoor kitchen/dining) · front 15′×40′',
+  'Porch slabs|All porches 15′ deep; back 25′ of the side porch is gravel under roof (no slab)',
   'Porch timber package|11 8×8 PT posts, 2x12 beams, 89 2x12 rafters, glulam ridge/eave/tie beams, front truss timbers',
   'Porch roof|Metal panels on 2x4 purlins (1,308 LF), 196 LF fascia',
   'Porch ceiling|2,620 sf 1x6 T&G pine',
@@ -298,7 +315,7 @@ function mkRow(s){
   const sub=s[0]==='>';const [label,note]=(sub?s.slice(1):s).split('|');
   return{id:id(),type:'item',sub,label,note:note||'',pct:'',est:'',paid:'',vendor:'',date:''};
 }
-function fresh(){return{tv:TEMPLATE_VERSION,steps:{},tab:'budget',proj:{name:'',owner:'',address:'',builder:''},fee:{mode:'amt',val:''},open:[0],
+function fresh(){return{tv:TEMPLATE_VERSION,steps:{},subs:{},tab:'budget',proj:{name:'',owner:'',address:'',builder:''},fee:{mode:'amt',val:''},open:[0],
   phases:TEMPLATE.map(([name,rows])=>({id:id(),name,rows:rows.map(mkRow)}))};}
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
@@ -321,7 +338,7 @@ function migrate(st){
     const full=r.sub?parent+' — '+r.label:r.label;let k=normK(full);
     if(p3&&k==='temporary electric')k='tempoary electric';
     if(has(r))old.push({...r,key:ALIAS[k]||k,full,used:false});}}
-  const nf=fresh();nf.proj=st.proj||nf.proj;nf.fee=st.fee||nf.fee;nf.steps=st.steps||{};nf.tab=st.tab||'budget';
+  const nf=fresh();nf.proj=st.proj||nf.proj;nf.fee=st.fee||nf.fee;nf.steps=st.steps||{};nf.subs=st.subs||{};nf.tab=st.tab||'budget';
   const copy=(r,o)=>{for(const k of['est','paid','vendor','date','pct'])r[k]=o[k]??''};
   for(const p of nf.phases){let parent='';for(const r of p.rows){
     if(r.type==='insp'){const o=insp[normK(r.label)];if(o){r.passed=o.passed;r.date=o.date}continue}
@@ -334,6 +351,12 @@ function migrate(st){
   return nf;
 }
 if(S.tv!==TEMPLATE_VERSION){S=migrate(S);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+// Plan updates (Nov 2026): refresh notes that still match the original wording
+const NOTE_FIX={'40×60 building + 20′ side porch + 15′ front porch':'40×60 building + 15′ deep wraparound porches',
+ 'Side 20′×75′ (outdoor kitchen/dining) · front 15′×40′':'All porches 15′ deep; back 25′ of the side porch is gravel under roof (no slab)',
+ 'Straight stair, 3′-6″ wide, 16 risers; 3 stringers, 15 treads, 42″ guard (67 LF)':'L-shaped stair with landing, 3′-6″ wide; 42″ guard at the open loft'};
+function fixNotes(st){for(const p of st.phases||[])for(const r of p.rows)if(r.note&&NOTE_FIX[r.note])r.note=NOTE_FIX[r.note];if(!st.subs)st.subs={};return st}
+fixNotes(S);
 let saveT;const flush=()=>{clearTimeout(saveT);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 let onSave=null;
 function save(){clearTimeout(saveT);saveT=setTimeout(flush,200);if(onSave)onSave()}
@@ -349,7 +372,9 @@ let editing=false;
 function rowHTML(p,r){
   const del=`<button class="x edit-only" data-del="${r.id}" title="Remove">✕</button>`;
   const lbl=editing?`<input class="t" data-k="label" value="${esc(r.label)}">`:esc(r.label);
-  const noteH=r.type!=='item'?'':editing?`<input class="t note-in" data-k="note" value="${esc(r.note||'')}" placeholder="Plan note">`:(r.note?`<span class="note">${esc(r.note)}</span>`:'');
+  const noteH=r.type!=='item'?'':editing?`<input class="t note-in" data-k="note" value="${esc(r.note||'')}" placeholder="Plan note">`+
+    `<select class="trade-sel" data-k="trade" title="Trade / sub"><option value="">Trade: ${esc(TRADE_NAME[defaultTradeOf(p,r)]||'General / Owner')} (default)</option>${TRADES.map(t=>`<option value="${t[0]}" ${r.trade===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select>`
+    :(r.note?`<span class="note">${esc(r.note)}</span>`:'');
   if(r.type==='header')return`<div class="row hdr" data-r="${r.id}"><span class="lbl">${lbl}</span>${del}</div>`;
   if(r.type==='insp')return`<div class="row insp ${r.passed?'passed':''}" data-r="${r.id}">
     <span class="lbl">🔍 Inspection: ${lbl}</span>
@@ -457,11 +482,11 @@ $('#fileIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;
   catch(err){alert("That file doesn't look like a House Budget backup.")}e.target.value=''};
 $('#btnCsv').onclick=()=>{
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
-  const L=[['Phase','Item','Type','%','Estimate','Actual Paid','Difference','Vendor','Date Complete / Passed','Plan Note'].map(q).join(',')];
+  const L=[['Phase','Item','Type','%','Estimate','Actual Paid','Difference','Vendor','Date Complete / Passed','Plan Note','Trade'].map(q).join(',')];
   for(const p of S.phases)for(const r of p.rows){
     if(r.type==='header')L.push([p.name,r.label,'Section'].map(q).join(','));
     else if(r.type==='insp')L.push([p.name,r.label,'Inspection','','','','',r.passed?'Passed':'',r.date].map(q).join(','));
-    else L.push([p.name,(r.sub?'  ':'')+r.label,r.sub?'Sub item':'Item',r.pct,r.est,r.paid,(r.est!==''||r.paid!=='')?(n(r.est)-n(r.paid)).toFixed(2):'',r.vendor,r.date,r.note||''].map(q).join(','));}
+    else L.push([p.name,(r.sub?'  ':'')+r.label,r.sub?'Sub item':'Item',r.pct,r.est,r.paid,(r.est!==''||r.paid!=='')?(n(r.est)-n(r.paid)).toFixed(2):'',r.vendor,r.date,r.note||'',TRADE_NAME[r.trade||defaultTradeOf(p,r)]||''].map(q).join(','));}
   let e=0;S.phases.forEach(p=>e+=phaseTot(p).e);const fee=S.fee.mode==='pct'?e*n(S.fee.val)/100:n(S.fee.val);
   L.push('',[ '','Materials and Cost','','',e.toFixed(2)].map(q).join(','),['','Builder Fee','','',fee.toFixed(2)].map(q).join(','),['','Total Est. Cost','','',(e+fee).toFixed(2)].map(q).join(','));
   download(`house-budget-${stamp()}.csv`,L.join('\n'),'text/csv');toast('CSV exported')};
@@ -470,7 +495,7 @@ function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');cl
 // '!' = inspection gate (label matches the Budget tab inspection)
 const STEPS=[
  ['Plans, Engineering & Permits','Turn the preliminary set into permit drawings and get approvals',[
-  ['Finalize the floor plan','Sign off on Rev 0 changes: straight stair, bedroom 2/3 closets, post P1, front porch posts, front wall'],
+  ['Finalize the floor plan','Sign off on changes: L-shaped stair, open loft, 15′ porches, centered front door, kitchen layout'],
   ['Order the steel building drawings','Give the supplier the rough openings, 16′ eave, 2:12 roof and the porch ledger girt + beam seats'],
   ["Get the engineer's stamp",'Loft floor, LVL beam B1, porch beams/glulams and the porch loads on the steel frame'],
   ['Choose window & door supplier','Decide nail-fin vs. block-frame units before ordering; ask for U ≤ 0.35, SHGC ≤ 0.27'],
@@ -487,7 +512,7 @@ const STEPS=[
   ['Construction entrance — gravel & mat',''],
   ['Silt fence',''],
   ['Clearing & grading',''],
-  ['Building pad','Pad big enough for the 40×60 plus the 20′ side porch and 15′ front porch'],
+  ['Building pad','Pad big enough for the 40×60 plus the 15′ deep wraparound porches'],
   ['!Site','Site / erosion control inspection'],
   ['Dumpster, port-a-potty & temporary electric',''],
   ['Stake the house & foundation survey','Stake the 40′×60′ steel line, porch lines and pier locations'],
@@ -513,12 +538,12 @@ const STEPS=[
   ['Interior walls','IW-1 and IW-2 are bearing; 2x6 at plumbing walls'],
   ['Loft floor','2x12 joists (12″ o.c. in the 16′ bay), LVL beam B1, post P1, ¾″ T&G glued & screwed'],
   ['Loft knee walls & back gable',''],
-  ['Stair & 42″ guard','16 risers, 3′-6″ wide'],
+  ['Stair & 42″ guard','L-shaped with a landing, 3′-6″ wide'],
   ['Ceiling strapping','2x4 @ 16″ under the purlins'],
   ['Blocking & backing','Fire blocking in tall walls; cabinet, TV, grab-bar backing; fireplace chase']]],
  ['Porches','Timber wraparound porch',[
   ['Pier footings & stone piers','11 piers, 30″ stone-veneered with concrete cores'],
-  ['Porch slabs','Side 20′×75′, front 15′×40′'],
+  ['Porch slabs','All 15′ deep; back 25′ of the side porch is gravel under roof'],
   ['Posts, beams & ledgers','8×8 PT posts on ABU88Z bases; 2-ply ledger on the steel ledger girt'],
   ['Rafters & front truss','2x12 rafters @ 16″, glulam ridge / eave / tie beams'],
   ['Purlins & metal roof',''],
@@ -601,10 +626,240 @@ document.addEventListener('input',ev=>{
 });
 function showTab(tab){
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-  $('#tabBudget').hidden=tab!=='budget';$('#tabSteps').hidden=tab!=='steps';
-  S.tab=tab;save();if(tab==='steps')renderSteps();else render();scrollTo(0,0);
+  $('#tabBudget').hidden=tab!=='budget';$('#tabSteps').hidden=tab!=='steps';$('#tabSubs').hidden=tab!=='subs';
+  S.tab=tab;save();if(tab==='steps')renderSteps();else if(tab==='subs')renderSubs();else render();scrollTo(0,0);
 }
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+$('#subsMoney').onchange=e=>{subsMoney=e.target.checked};
+$('#btnSubsPdf').onclick=e=>deliverPdf(null,e.currentTarget);
+
+// ---------- Subcontractors / trades ----------
+const TRADES=[
+ ['design','Design & Engineering','Turn the preliminary plan set (Rev 0, Oct 27 2026) into permit drawings to the IRC as adopted by the county. Engineer to stamp the loft floor (40 psf live / 10 psf dead), LVL beam B1, porch beams and glulams, and the porch loads bearing on the steel frame. Steel supplier provides stamped building drawings.'],
+ ['permits','Permits, Fees & Insurance','Owner/GC items: county permits and fees, LDP, permit box, builders risk insurance.'],
+ ['survey','Surveyor','Stake the 40′×60′ steel line, porch lines and the 11 porch pier locations; foundation survey.'],
+ ['site','Site Work & Grading','Clearing and grading, construction entrance (gravel + mat), silt fence, building pad sized for the 40×60 building plus 15′ deep wraparound porches, backfill. Back 25′ of the side porch (by the mud room) is gravel under roof, no slab.'],
+ ['septic','Septic','Septic permit, perc test and system sized for 3 bedrooms / 2½ baths.'],
+ ['concrete','Concrete & Foundation','2,400 sf slab. Thickened footings 12″ deep × 18–24″ wide under bearing walls IW-1, IW-2 and the side walls (they carry the loft). 24″×24″×12″ pad at post P1 (kitchen/den edge). Steel column piers and anchor bolts per the steel building drawings; 1/2″×10″ anchor bolts at 6′ o.c. for exterior wood wall plates. Porch slabs for 15′ deep porches (no slab on the back 25′ of the side porch). Concrete cores in the 11 stone piers.'],
+ ['termite','Pest Control','Termite pre-treat of the soil before the slab pour.'],
+ ['steel','Steel Building Supplier & Erector','40′×60′ steel building, 16′ eave, 2:12 roof (ridge ±19′-4″), black board & batten look to match the rendering. Include a continuous porch ledger girt (top of ledger 14′-0″) and beam seats for the front porch eave beams. Frame all window and door rough openings in the girts and supply head/jamb/sill trim in panel color (353 LF).'],
+ ['framing','Framing Carpenter','Wood framing inside the steel shell. Exterior walls 2x6 @ 16″ with PT bottom plates; interior 2x4 (2x6 at plumbing walls). 9′ precut studs (plate 9′-1 1/8″). Walls over 10′ (den, nook, front gable) tied to every girt line. Loft floor at 10′-1 1/8″: 2x12 #2 SYP @ 16″ (12″ in the 16′ bay), 3-ply LVL beam B1 on HU212 hangers, 6×6 post P1, 3/4″ T&G glued and screwed; loft stays wide open (no rooms) with room in the floor for ductwork. L-shaped stair with landing, 42″ guard. 2x4 ceiling strapping @ 16″ under the purlins. Fire blocking and backing for cabinets, TV, grab bars and the fireplace chase. Takeoff: 21,948 bf / 1,436 pieces.'],
+ ['masonry','Masonry','11 stone-veneered porch piers, 30″, with concrete cores; set ABU88Z post bases for 8×8 posts.'],
+ ['porch','Porch / Timber Framing','Timber wraparound porch, all porches 15′ deep, 2:12 metal roof on 2x4 purlins @ 24″, 1x6 T&G pine ceiling. 8×8 PT posts on the stone piers; 2-ply PT ledger on the steel ledger girt; 2x12 #1 SYP rafters @ 16″ with LSSU210 / LSSR210 hangers and H2.5A ties; glulam ridge, eave and tie beams and the exposed front gable truss timbers; 2x8 fascia; 3-riser front steps between posts.'],
+ ['windows','Windows & Exterior Doors','20 window units in 13 openings (1 awning, 10 single-hung, 1 slider, 8 fixed transoms), black frames, U ≤ 0.35 and SHGC ≤ 0.27. Egress windows in all bedrooms; W-3 at the master shower tempered and obscure. Doors: D-1 half-lite (mud room), D-2 full-lite (den), D-3 front entry 6′×8′ French pair with sidelites and a 4-wide transom, centered on the front wall. Flashing tape, sill pans and low-expansion foam.'],
+ ['plumbing','Plumbing','3 bed / 2½ bath. Master bath (shower + vanity), hall bath with tub between bedrooms 2 and 3, half bath by the stair; kitchen sink under the window with dishwasher to the right, island; laundry; outdoor kitchen on the side porch. Under-slab rough before the pour, top-out rough, trim and fixtures.'],
+ ['hvac','HVAC','Condition the 2,400 sf main floor, the 1,642 sf open loft and the vaulted den / nook (ceilings to 18′-11″). Ductwork can run in the deep loft floor. Rough-in, equipment, trim and startup.'],
+ ['electrical','Electrical','Temporary pole, rough-in, panel, trim-out, light package, permanent service and power release inspection.'],
+ ['lowvolt','Low Voltage','Data, TV, cameras, speakers and alarm wiring; trim-out.'],
+ ['gas','Gas','Gas lines for any gas appliances and the fireplace if gas.'],
+ ['fireplace','Fireplace','Prefab fireplace in the den with framed chase; confirm unit specs for framing.'],
+ ['insulation','Insulation','Steel walls and roof, loft knee walls, sound insulation in bedroom walls; meet Georgia energy code.'],
+ ['drywall','Drywall','Hang, tape and finish all walls and ceilings including the vaulted den / nook ceilings up to 18′-11″.'],
+ ['trim','Trim Carpenter','14 interior doors including two 5′ bifolds; 1x4 picture-frame casing (353 LF), base, jamb extensions for 2x6 walls; stair treads and guard finish.'],
+ ['paint','Painter','Interior paint and final touch-ups.'],
+ ['cabinets','Cabinets','Kitchen 28′×15′ with island — plain cabinets, no appliance garage; refrigerator not in the back-left corner (door must open); sink under the window with dishwasher to its right. Bath vanities and laundry.'],
+ ['counters','Countertops','Kitchen and island, baths; template after cabinets are set.'],
+ ['flooring','Flooring & Tile','Floor coverings, wall tile and shower tile.'],
+ ['appliances','Appliances','Kitchen appliance package.'],
+ ['specialties','Specialties','Mirrors, shower doors, closet shelving, hardware.'],
+ ['gutters','Gutters','Gutters and downspouts.'],
+ ['paving','Driveway / Paving','Driveway.'],
+ ['landscape','Landscaping','Final grade, sod / seed and plants.'],
+ ['cleaning','Cleaning','Rough clean, pressure wash and final clean.'],
+ ['gc','General / Owner','Dumpsters, portable toilet, outdoor kitchen, walk-throughs, punch-out, closing and warranty.']
+];
+const TRADE_NAME=Object.fromEntries(TRADES.map(t=>[t[0],t[1]]));
+const TRADE_DEFAULT={
+ 'permit-ready plan set':'design',"engineer's stamp":'design','stamped steel building drawings':'design','site plan / zoning verification':'design','flood elevation plan':'design','erosion control plan':'design',
+ 'builders risk insurance':'permits','pc permits and fees':'permits','ldp (land disturbance permit)':'permits','permit box':'permits','building permit / fees':'permits',
+ 'environmental health / septic':'septic','foundation survey / house stake':'survey',
+ 'grading and clearing':'site','construction entrance — gravel and mat':'site','silt fence':'site','building pad':'site','back fill':'site',
+ 'dumpster fees':'gc','port-a-potty':'gc','job site clean up':'gc','dumpster / clean up':'gc','outdoor kitchen':'gc','systems walk through':'gc','final punch-out':'gc','customer walk through':'gc','delivery':'gc','warranty':'gc','closing':'gc',
+ 'temporary electric':'electrical','electrical rough':'electrical','electrical trim':'electrical','light package':'electrical','permanent power':'electrical',
+ 'under-slab plumbing':'plumbing','plumbing rough':'plumbing','plumbing trim':'plumbing',
+ 'foundation prep':'concrete','steel column piers / anchor bolts':'concrete','p1 post footing':'concrete','concrete slab':'concrete','porch slabs':'concrete',
+ 'termite pre-treat':'termite',
+ 'steel building kit':'steel','steel erection labor':'steel','opening trim in panel color':'steel',
+ 'wall lumber':'framing','loft floor package':'framing','stair & guard':'framing','ceiling strapping':'framing','hardware & fasteners':'framing','framing labor':'framing',
+ 'stone piers & footings':'masonry',
+ 'porch timber package':'porch','porch roof':'porch','porch ceiling':'porch','porch labor':'porch','front steps':'porch',
+ 'window package':'windows','exterior doors':'windows','install materials':'windows','window & door install labor':'windows',
+ 'hvac rough':'hvac','hvac trim':'hvac','fireplace':'fireplace','low voltage':'lowvolt','low voltage trim':'lowvolt','gas lines':'gas',
+ 'insulation':'insulation','drywall':'drywall',
+ 'interior doors':'trim','interior trim package':'trim','stair treads & guard finish':'trim',
+ 'paint':'paint','final paint':'paint','cabinets':'cabinets','counter tops':'counters','flooring / wall tile / labor':'flooring','flooring':'flooring',
+ 'appliances':'appliances','specialties':'specialties','gutters':'gutters','driveway':'paving','landscaping':'landscape',
+ 'rough clean':'cleaning','pressure wash':'cleaning','final clean':'cleaning'
+};
+const INSP_TRADES={'site':['site'],'under slab':['plumbing'],'foundation':['concrete'],'framing':['framing','porch','steel'],
+ 'rough-in':['plumbing','hvac','electrical','gas','lowvolt','fireplace'],'insulation':['insulation'],'power release':['electrical'],'final/co':['gc']};
+// Each line item with its trade (sub items follow their parent unless set)
+function tradeItems(){
+  const out=[];
+  for(const p of S.phases){let parent=null;for(const r of p.rows){
+    if(r.type!=='item')continue;
+    let t=r.trade;
+    if(!t){if(r.sub&&parent)t=parent._t;else t=TRADE_DEFAULT[normK(r.label)]||'gc'}
+    if(!TRADE_NAME[t])t='gc';
+    if(!r.sub)parent={_t:t,label:r.label};
+    out.push({r,p,trade:t,parent:r.sub&&parent?parent.label:null});}}
+  return out;
+}
+function defaultTradeOf(p,r){let parent=null;for(const x of p.rows){if(x===r)break;if(x.type==='item'&&!x.sub)parent=x}
+  if(r.sub&&parent)return parent.trade||TRADE_DEFAULT[normK(parent.label)]||'gc';return TRADE_DEFAULT[normK(r.label)]||'gc'}
+function tradeSummary(){
+  const by={};for(const t of TRADES)by[t[0]]={id:t[0],name:t[1],scope:t[2],items:[],est:0,paid:0,insp:[]};
+  for(const it of tradeItems()){const g=by[it.trade];g.items.push(it);g.est+=n(it.r.est);g.paid+=n(it.r.paid)}
+  for(const p of S.phases)for(const r of p.rows)if(r.type==='insp'){for(const t of(INSP_TRADES[normK(r.label)]||[]))by[t]&&by[t].insp.push(r)}
+  return TRADES.map(t=>by[t[0]]).filter(g=>g.items.length||subInfo(g.id).company);
+}
+const subInfo=id=>(S.subs&&S.subs[id])||{};
+let subsMoney=true;
+function renderSubs(){
+  if(!S.subs)S.subs={};
+  const groups=tradeSummary();
+  $('#subList').innerHTML=groups.map(g=>{const si=subInfo(g.id);
+    const done=g.items.filter(i=>n(i.r.pct)>=100).length;
+    return`<section class="stage subcard" data-sub="${g.id}">
+      <h2>${esc(g.name)}<small>${g.items.length} item${g.items.length==1?'':'s'} · ${fmt0(g.est)} est · ${fmt0(g.paid)} paid</small></h2>
+      <div class="subgrid">
+        <label class="f">Company<input class="t" data-f="company" value="${esc(si.company||'')}" placeholder="Company name"></label>
+        <label class="f">Contact<input class="t" data-f="contact" value="${esc(si.contact||'')}" placeholder="Name"></label>
+        <label class="f">Phone<input class="t" data-f="phone" type="tel" value="${esc(si.phone||'')}" placeholder="(555) 555-5555"></label>
+        <label class="f">Email<input class="t" data-f="email" type="email" value="${esc(si.email||'')}" placeholder="email@example.com"></label>
+        <label class="f" style="grid-column:1/-1">Notes for this sub<input class="t" data-f="notes" value="${esc(si.notes||'')}" placeholder="Bid due date, special instructions, license/insurance…"></label>
+      </div>
+      <details class="scope"><summary>Scope: ${g.items.map(i=>esc(i.r.label)).slice(0,4).join(', ')}${g.items.length>4?'…':''}${done?` · ${done} done`:''}</summary>
+        <p class="hint">${esc(g.scope)}</p>
+        <ul>${g.items.map(i=>`<li>${i.parent?esc(i.parent)+' — ':''}${esc(i.r.label)}${i.r.note?`<span class="note">${esc(i.r.note)}</span>`:''}</li>`).join('')}</ul>
+      </details>
+      <div class="row2" style="padding:0 14px 12px"><button class="btn" data-subpdf="${g.id}">📄 Scope sheet PDF</button></div>
+    </section>`}).join('');
+}
+document.addEventListener('input',ev=>{const t=ev.target,c=t.closest('[data-sub]');if(!c||!t.dataset.f)return;
+  if(!S.subs)S.subs={};const id=c.dataset.sub;S.subs[id]={...(S.subs[id]||{}),[t.dataset.f]:t.value};save();});
+
+// ---------- PDF ----------
+let pdfLibP=null;
+function loadPdfLib(){if(window.PDFLib)return Promise.resolve(window.PDFLib);
+  return pdfLibP||(pdfLibP=new Promise((ok,bad)=>{const s=document.createElement('script');s.src='lib/pdf-lib.min.js';s.onload=()=>ok(window.PDFLib);s.onerror=()=>{pdfLibP=null;bad(new Error('Could not load the PDF tool. Check your connection and try again.'))};document.head.appendChild(s)}));}
+const PDF_CHARS={'′':"'",'″':'"','×':'x','—':'-','–':'-','≤':'<=','≥':'>=','·':'-','’':"'",'‘':"'",'“':'"','”':'"','…':'...','±':'+/-','½':' 1/2','¼':' 1/4','¾':' 3/4','•':'-','↳':'-'};
+const pdfText=s=>String(s??'').replace(/[′″×—–≤≥·’‘“”…±½¼¾•↳]/g,c=>PDF_CHARS[c]).replace(/[^\x20-\x7e\n]/g,'').replace(/(^|[^0-9]) (\d\/\d)/g,'$1$2');
+async function makePdf(only){
+  const {PDFDocument,StandardFonts,rgb}=await loadPdfLib();
+  const money=subsMoney;
+  const doc=await PDFDocument.create();
+  const F=await doc.embedFont(StandardFonts.Helvetica),B=await doc.embedFont(StandardFonts.HelveticaBold);
+  const W=612,H=792,M=42,CW=W-2*M;
+  const INK=rgb(.12,.16,.14),MUT=rgb(.42,.45,.43),ACC=rgb(.18,.42,.31),LINE=rgb(.86,.84,.8),SHADE=rgb(.94,.92,.88),GOLD=rgb(.63,.48,.17);
+  let page,y;
+  const newPage=()=>{page=doc.addPage([W,H]);y=H-M;};
+  const ensure=h=>{if(y-h<M+24)newPage()};
+  const wrap=(t,size,font,width)=>{const out=[];for(const para of pdfText(t).split('\n')){let line='';
+    for(const w of para.split(/\s+/)){if(!w)continue;const test=line?line+' '+w:w;
+      if(font.widthOfTextAtSize(test,size)<=width)line=test;
+      else{if(line)out.push(line);let ww=w;while(font.widthOfTextAtSize(ww,size)>width){let k=ww.length;while(k>1&&font.widthOfTextAtSize(ww.slice(0,k),size)>width)k--;out.push(ww.slice(0,k));ww=ww.slice(k)}line=ww}}
+    out.push(line)}return out};
+  const text=(t,x,yy,size,font,color,align,width)=>{const s=pdfText(t);let xx=x;
+    if(align==='right')xx=x+width-font.widthOfTextAtSize(s,size);else if(align==='center')xx=x+(width-font.widthOfTextAtSize(s,size))/2;
+    page.drawText(s,{x:xx,y:yy,size,font,color:color||INK})};
+  const para=(t,size=10,font=F,color=INK,gap=3)=>{for(const l of wrap(t,size,font,CW)){ensure(size+gap);text(l,M,y-size,size,font,color);y-=size+gap}};
+  const table=(cols,rows,opt={})=>{
+    const size=opt.size||9,pad=4,lh=size+2.5;
+    const head=()=>{ensure(lh+2*pad+lh);page.drawRectangle({x:M,y:y-lh-2*pad,width:CW,height:lh+2*pad,color:SHADE});
+      let x=M;for(const c of cols){text(c.t,x+pad,y-pad-size,size-.5,B,MUT,c.a,c.w-2*pad);x+=c.w}y-=lh+2*pad;};
+    head();
+    for(const row of rows){
+      const cells=row.cells.map((v,i)=>wrap(v,size,row.bold||cols[i].b?B:F,cols[i].w-2*pad));
+      const sub=row.subs?row.subs.map((v,i)=>v?wrap(v,size-1.5,F,cols[i].w-2*pad):[]):[];
+      const hgt=Math.max(...cells.map((c,i)=>c.length*lh+((sub[i]||[]).length*(lh-1.5))))+2*pad;
+      if(y-hgt<M+24){newPage();head()}
+      if(row.shade)page.drawRectangle({x:M,y:y-hgt,width:CW,height:hgt,color:SHADE});
+      let x=M;cells.forEach((ls,i)=>{let yy=y-pad-size;
+        ls.forEach(l=>{text(l,x+pad,yy,size,row.bold||cols[i].b?B:F,row.color||INK,cols[i].a,cols[i].w-2*pad);yy-=lh});
+        (sub[i]||[]).forEach(l=>{text(l,x+pad,yy+1,size-1.5,F,MUT,cols[i].a,cols[i].w-2*pad);yy-=lh-1.5});x+=cols[i].w});
+      y-=hgt;page.drawLine({start:{x:M,y},end:{x:M+CW,y},thickness:.5,color:LINE});
+    }
+    y-=8;
+  };
+  const proj=S.proj||{};const today=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  const all=tradeSummary();const groups=only?all.filter(g=>g.id===only):all;
+  const status=r=>n(r.pct)>=100?'Done'+(r.date?' '+r.date:''):(r.pct!==''?n(r.pct)+'%':'');
+  const header=(title,subtitle)=>{
+    page.drawRectangle({x:0,y:H-96,width:W,height:96,color:INK});
+    text(title,M,H-48,20,B,rgb(.96,.95,.92));
+    text(subtitle,M,H-68,10,F,rgb(.8,.82,.8));
+    text(today,M,H-68,10,F,rgb(.8,.82,.8),'right',CW);
+    y=H-116;
+    const info=[['Project',proj.name||'Our home'],['Owner',proj.owner],['Address',proj.address],['Builder / GC',proj.builder]].filter(x=>x[1]);
+    for(const [k,v] of info){ensure(14);text(k,M,y-10,9,B,MUT);text(v,M+80,y-10,10,F);y-=14}
+    ensure(14);text('Plans',M,y-10,9,B,MUT);
+    for(const l of wrap("40x60 Barndominium - 2,400 sf main floor, 1,642 sf open loft, 15' deep wraparound porches - Plan Set Rev 0 (Oct 27, 2026)",10,F,CW-80)){ensure(14);text(l,M+80,y-10,10,F);y-=14}y-=10;
+  };
+  const section=(g,big)=>{
+    const si=subInfo(g.id);
+    ensure(110);
+    if(!big){page.drawRectangle({x:M,y:y-24,width:CW,height:24,color:ACC});text(g.name,M+8,y-16.5,12,B,rgb(1,1,1));
+      if(money)text(`${fmt0(g.est)} est  -  ${fmt0(g.paid)} paid`,M,y-16.5,9.5,F,rgb(.92,.96,.93),'right',CW-8);y-=32;}
+    const contact=[si.company,si.contact,si.phone,si.email].filter(Boolean).join('   |   ');
+    text('Subcontractor',M,y-10,9,B,MUT);
+    if(contact)text(contact,M+80,y-10,10,F);else{page.drawLine({start:{x:M+80,y:y-11},end:{x:M+CW,y:y-11},thickness:.6,color:LINE})}
+    y-=18;
+    text('Scope of work',M,y-10,9,B,MUT);y-=14;para(g.scope,10,F,INK,3.5);y-=4;
+    const cols=money?[{t:'Item',w:150,b:1},{t:'Plan details',w:CW-150-62*3-50},{t:'Estimate',w:62,a:'right'},{t:'Paid',w:62,a:'right'},{t:'Balance',w:62,a:'right'},{t:'Status',w:50}]
+      :[{t:'Item',w:170,b:1},{t:'Plan details',w:CW-170-70},{t:'Status',w:70}];
+    const rows=g.items.map(i=>{const r=i.r,lbl=(i.parent?i.parent+' - ':'')+r.label;const vend=r.vendor&&r.vendor!==si.company?'Vendor: '+r.vendor:'';
+      return money?{cells:[lbl,r.note||'',r.est!==''?fmt(n(r.est)):'',r.paid!==''?fmt(n(r.paid)):'',(r.est!==''||r.paid!=='')?fmt(n(r.est)-n(r.paid)):'',status(r)],subs:[vend,'','','','','']}
+        :{cells:[lbl,r.note||'',status(r)],subs:[vend,'','']}});
+    if(money)rows.push({cells:['Total','',fmt(g.est),fmt(g.paid),fmt(g.est-g.paid),''],bold:1,shade:1});
+    table(cols,rows);
+    if(g.insp.length){ensure(30);text('Inspections this trade must pass',M,y-10,9,B,MUT);y-=16;
+      for(const r of g.insp){ensure(14);text((r.passed?'[x] ':'[  ] ')+r.label+(r.passed&&r.date?'  - passed '+r.date:''),M+8,y-10,10,F,r.passed?ACC:INK);y-=14}y-=4}
+    if(si.notes){ensure(30);text('Notes',M,y-10,9,B,MUT);y-=14;para(si.notes,10);y-=4}
+    if(big){
+      ensure(130);y-=6;text('Bid / acceptance',M,y-10,11,B,GOLD);y-=24;
+      for(const row of [['Bid amount $','Start date'],['Duration (days)','Bid valid until'],['License #','Insurance on file (Y/N)'],['Signature','Date']]){
+        ensure(26);[0,1].forEach(k=>{const x=M+k*(CW/2+6),w=CW/2-6;text(row[k],x,y-10,9,F,MUT);
+          const lw=F.widthOfTextAtSize(pdfText(row[k]),9)+6;page.drawLine({start:{x:x+lw,y:y-11},end:{x:x+w,y:y-11},thickness:.6,color:MUT})});y-=26}
+    }
+    y-=10;
+  };
+  newPage();
+  if(only){const g=groups[0];
+    header('Scope of Work: '+g.name,(proj.name||'Our home')+' - Subcontractor scope sheet');
+    section(g,true);
+  }else{
+    header('Subcontractor Breakdown',(proj.name||'Our home')+' - '+groups.length+' trades');
+    text('Summary',M,y-12,13,B,GOLD);y-=22;
+    const cols=money?[{t:'#',w:22},{t:'Trade',w:150,b:1},{t:'Company / contact',w:CW-22-150-70*3},{t:'Estimate',w:70,a:'right'},{t:'Paid',w:70,a:'right'},{t:'Balance',w:70,a:'right'}]
+      :[{t:'#',w:22},{t:'Trade',w:170,b:1},{t:'Company / contact',w:CW-22-170-60},{t:'Items',w:60,a:'right'}];
+    let te=0,tp=0;
+    const rows=groups.map((g,i)=>{te+=g.est;tp+=g.paid;const si=subInfo(g.id);const who=[si.company,si.contact,si.phone].filter(Boolean).join(' - ')||'Not assigned';
+      return money?{cells:[String(i+1),g.name,who,fmt0(g.est),fmt0(g.paid),fmt0(g.est-g.paid)],color:si.company?INK:undefined}:{cells:[String(i+1),g.name,who,String(g.items.length)]}});
+    if(money)rows.push({cells:['','All trades','',fmt0(te),fmt0(tp),fmt0(te-tp)],bold:1,shade:1});
+    table(cols,rows);
+    newPage();
+    for(const g of groups)section(g,false);
+  }
+  const pages=doc.getPages(),label=only?'Scope sheet':'Subcontractor breakdown';
+  pages.forEach((pg,i)=>{const s=pdfText(`${proj.name||'Our home'}  -  ${label}  -  Page ${i+1} of ${pages.length}`);
+    pg.drawText(s,{x:(W-F.widthOfTextAtSize(s,8))/2,y:22,size:8,font:F,color:MUT})});
+  const bytes=await doc.save();
+  const safe=s=>pdfText(s).replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  const name=only?`Scope-${safe(TRADE_NAME[only])}-${new Date().toISOString().slice(0,10)}.pdf`:`Subcontractor-Breakdown-${new Date().toISOString().slice(0,10)}.pdf`;
+  return{bytes,name};
+}
+async function deliverPdf(only,btn){
+  const old=btn&&btn.textContent;if(btn){btn.disabled=true;btn.textContent='Making PDF…'}
+  try{const {bytes,name}=await makePdf(only);
+    const file=new File([bytes],name,{type:'application/pdf'});
+    const touch=matchMedia('(pointer:coarse)').matches;
+    if(touch&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return}catch(e){if(e.name==='AbortError')return}}
+    download(name,bytes,'application/pdf');toast('PDF saved');
+  }catch(e){alert(e.message||String(e))}
+  finally{if(btn){btn.disabled=false;btn.textContent=old}}
+}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-subpdf]');if(b)deliverPdf(b.dataset.subpdf,b)});
 
 // ---------- Cloud sync (Firebase Firestore, REST) ----------
 const FS_PROJECT='housebudget-a0972';
@@ -637,7 +892,7 @@ function setSync(state,msg){syncState=state;syncMsg=msg||'';if(state==='ok')last
   const pill=$('#syncPill');pill.className='syncpill '+state;
   $('#syncTxt').textContent=!SY.code?'Sync off':state==='busy'?'Syncing…':state==='err'?'Sync error':'Synced';
   if(panelOpen)renderSync();}
-function rerender(){if(S.tab==='steps')renderSteps();else render()}
+function rerender(){if(S.tab==='steps')renderSteps();else if(S.tab==='subs')renderSubs();else render()}
 const typing=()=>{const a=document.activeElement;return a&&a.matches('input,select,textarea')&&!a.closest('#syncPanel')};
 function applyRemote(doc){
   if(!doc||!doc.json)return;
@@ -645,7 +900,7 @@ function applyRemote(doc){
   let d;try{d=JSON.parse(doc.json)}catch(e){return}
   if(!d.phases)return;
   const mig=d.tv!==TEMPLATE_VERSION;
-  S={...migrate(d),open:S.open||[0],tab:S.tab||'budget'};S.steps=S.steps||{};
+  S={...fixNotes(migrate(d)),open:S.open||[0],tab:S.tab||'budget'};S.steps=S.steps||{};
   try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
   lastPayload=payload();SY.lastAt=doc.at;SY.dirty=false;saveSY();rerender();if(mig)onSave();
 }
