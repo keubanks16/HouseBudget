@@ -216,6 +216,21 @@ function windowZ(x, a, b, sill, head, cols = 2, rows = 3) {
   for (let j = 1; j < rows; j++) box(x - 0.1, sill + h * j / rows - 0.06, a, 0.2, 0.12, w, M.frame, g, false);
   const gl = new THREE.Mesh(new THREE.PlaneGeometry(w, h), M.glass); gl.rotation.y = Math.PI / 2; gl.position.set(x, sill + h / 2, a + w / 2); g.add(gl);
 }
+function stripX(pts, z, t, mat = M.frame) { const sh = new THREE.Shape(); pts.forEach(([x, y], i) => i ? sh.lineTo(x, y) : sh.moveTo(x, y)); const m = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: t, bevelEnabled: false }), mat); m.position.z = z - t / 2; m.castShadow = m.receiveShadow = true; g.add(m); return m; }
+function paneX(pts, z) { const sh = new THREE.Shape(); pts.forEach(([x, y], i) => i ? sh.lineTo(x, y) : sh.moveTo(x, y)); const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), M.glass); m.position.z = z; g.add(m); return m; }
+function trapX(z, a, b, yb, ta, tb, cols = 4) {
+  const f = 0.2; paneX([[a, yb], [b, yb], [b, tb], [a, ta]], z);
+  box(a - 0.1, yb - 0.1, z - 0.14, b - a + 0.2, f, 0.28, M.frame); box(a - 0.1, yb, z - 0.14, f, ta - yb, 0.28, M.frame); box(b - 0.1, yb, z - 0.14, f, tb - yb, 0.28, M.frame);
+  stripX([[a - 0.1, ta - f], [b + 0.1, tb - f], [b + 0.1, tb + 0.05], [a - 0.1, ta + 0.05]], z, 0.28);
+  for (let i = 1; i < cols; i++) { const xx = a + (b - a) * i / cols; box(xx - 0.06, yb, z - 0.1, 0.12, ta + (tb - ta) * i / cols - yb, 0.2, M.frame, g, false); }
+}
+function peakX(z, a, b, yb, ts, tp, cols = 6) {
+  const f = 0.2, m = (a + b) / 2; paneX([[a, yb], [b, yb], [b, ts], [m, tp], [a, ts]], z);
+  box(a - 0.1, yb - 0.1, z - 0.14, b - a + 0.2, f, 0.28, M.frame); box(a - 0.1, yb, z - 0.14, f, ts - yb, 0.28, M.frame); box(b - 0.1, yb, z - 0.14, f, ts - yb, 0.28, M.frame);
+  stripX([[a - 0.1, ts - f], [m, tp - f], [m, tp + 0.05], [a - 0.1, ts + 0.05]], z, 0.28); stripX([[m, tp - f], [b + 0.1, ts - f], [b + 0.1, ts + 0.05], [m, tp + 0.05]], z, 0.28);
+  for (let i = 1; i < cols; i++) { const xx = a + (b - a) * i / cols, top = ts + (tp - ts) * (1 - Math.abs(xx - m) / (m - a)); box(xx - 0.06, yb, z - 0.1, 0.12, top - yb, 0.2, M.frame, g, false); }
+}
+function extMatWedge() { return [M.wall, M.wall]; }
 function casingZ(x, a, b, h, inside = 1) { const c = M.white; box(x - 0.3, 0, a - 0.3, 0.6, h + 0.3, 0.3, c, g, false); box(x - 0.3, 0, b, 0.6, h + 0.3, 0.3, c, g, false); box(x - 0.3, h, a - 0.3, 0.6, 0.3, b - a + 0.6, c, g, false); }
 function casingX(z, a, b, h) { const c = M.white; box(a - 0.3, 0, z - 0.3, 0.3, h + 0.3, 0.6, c, g, false); box(b, 0, z - 0.3, 0.3, h + 0.3, 0.6, c, g, false); box(a - 0.3, h, z - 0.3, b - a + 0.6, 0.3, 0.6, c, g, false); }
 function doorSlabZ(x, a, b, h, swing = 1) { // open ~80°, hinged at a
@@ -243,9 +258,11 @@ box(0.3, 0, 0.3, 11.4, 0.012, 11.4, floorMat(11.4, 11.4, T.rug, 11.4), g, false)
 const TH = 0.5;
 wallX(0, 0, 40, 16, TH, [{ a: 14.6, b: 16.6, sill: 2, head: 8 }, { a: 23.4, b: 25.4, sill: 2, head: 8 }, { a: 17, b: 23, sill: 10.5, head: 13 }, { a: 32, b: 36, sill: 5, head: 8 }], '-z', true);
 windowX(0, 14.6, 16.6, 2, 8, 1, 3); windowX(0, 23.4, 25.4, 2, 8, 1, 3); windowX(0, 17, 23, 10.5, 13, 3, 1); windowX(0, 32, 36, 5, 8, 2, 1);
-wallX(60, 0, 40, 16, TH, [{ a: 5, b: 10, sill: 2.8, head: 11.25 }, { a: 14.8, b: 25.2, sill: 0, head: 13 }, { a: 30, b: 35, sill: 2.8, head: 11.25 }], '+z', true);
-windowX(60, 5, 10, 2.8, 8.5, 4, 3); windowX(60, 5, 10, 8.5, 11.25, 4, 1); windowX(60, 30, 35, 2.8, 8.5, 4, 3); windowX(60, 30, 35, 8.5, 11.25, 4, 1);
-windowX(60, 14.8, 16.8, 0.1, 8.6, 1, 4); windowX(60, 23.2, 25.2, 0.1, 8.6, 1, 4); windowX(60, 16.8, 20, 0.1, 8.6, 2, 4); windowX(60, 20, 23.2, 0.1, 8.6, 2, 4); windowX(60, 14.8, 25.2, 8.8, 13, 6, 1);
+wallX(60, 0, 40, 16, TH, [{ a: 7, b: 13, sill: 2.8, head: 12.6 }, { a: 14.8, b: 25.2, sill: 0, head: 13 }, { a: 27, b: 33, sill: 2.8, head: 12.6 }], '+z', true);
+for (const pts of [[[7, 10.1], [13, 12.6], [7, 12.6]], [[33, 10.1], [33, 12.6], [27, 12.6]], [[14.8, 10.85], [20, 13.0], [14.8, 13.0]], [[25.2, 10.85], [25.2, 13.0], [20, 13.0]]]) stripX(pts, 60, TH, extMatWedge());
+windowX(60, 7, 13, 2.8, 8.6, 4, 4); trapX(60, 7, 13, 8.8, 10.1, 12.6, 4);
+windowX(60, 27, 33, 2.8, 8.6, 4, 4); trapX(60, 27, 33, 8.8, 12.6, 10.1, 4);
+windowX(60, 14.8, 16.8, 0.1, 8.6, 1, 5); windowX(60, 23.2, 25.2, 0.1, 8.6, 1, 5); windowX(60, 16.8, 20, 0.1, 8.6, 2, 5); windowX(60, 20, 23.2, 0.1, 8.6, 2, 5); peakX(60, 14.8, 25.2, 8.8, 10.85, 13.0, 6);
 box(16.8, 0, 59.6, 3.2, 0.3, 0.8, M.frame); box(20, 0, 59.6, 3.2, 0.3, 0.8, M.frame);   // door bottom rails
 cyl(19.6, 3.4, 59.6, 0.05, 1.2, M.black); cyl(20.4, 3.4, 59.6, 0.05, 1.2, M.black);           // handles
 wallZ(0, 0, 60, 16, TH, [{ a: 19.4, b: 22.4, sill: 0, head: 8 }, { a: 31, b: 35, sill: 3.5, head: 8 }, { a: 42, b: 45, sill: 0, head: 8 }], '-x');
