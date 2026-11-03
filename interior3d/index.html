@@ -30,6 +30,7 @@
   <button data-v="stair">Stair detail</button>
   <button data-v="loft">Loft</button>
   <button data-v="master">Master</button>
+  <button data-v="dog">Dog station</button>
   <button data-v="plan">Plan check</button>
   <button data-v="doll">Dollhouse</button>
   <button id="time">Evening</button>
@@ -257,12 +258,24 @@ for (const [a, b] of [[15, 19], [32, 36], [25, 27]]) windowZ(40, a, b, 11.7, 14.
 for (const [x, z, w, d] of [[0.25, 45.2, 0.35, 14.5], [0.25, 22.6, 0.35, 8.2], [0.25, 35.2, 0.35, 7.5], [0.25, 59.4, 14.5, 0.35], [25.3, 59.4, 14.5, 0.35], [39.4, 45.2, 0.35, 14.5], [39.4, 57.2, 0.35, 2.3]]) box(x, 0, z, w, 0.45, d, M.white, g, false);
 
 // ================= interior walls =================
-const H9 = 9, fh = x => roofH(x) - 0.3;
-box(11.75, 0, 0, 0.5, fh(12), 7, M.wall); box(11.75, 0, 10, 0.5, fh(12), 2, M.wall); box(11.75, 8, 7, 0.5, fh(12) - 8, 3, M.wall); casingZ(12, 7, 10, 8); doorSlabZ(11.95, 7, 10, 8, 1);
-gableWall(12, 3.6, 12, 0, TH); gableWall(12, 0, 0.6, 0, TH); gableWall(12, 0.6, 3.6, 8, TH); casingX(12, 0.6, 3.6, 8);
-gableWall(16, 12, 20.4, 0, TH); gableWall(16, 23, 24.5, 0, TH); gableWall(16, 27.5, 28, 0, TH); gableWall(16, 20.4, 23, 8, TH); gableWall(16, 24.5, 27.5, 8, TH); casingX(16, 20.4, 23, 8); casingX(16, 24.5, 27.5, 8); doorSlabX(16.1, 24.5, 27.5, 8, -1);
-box(27.75, 0, 0, 0.5, fh(28), 7, M.wall); box(27.75, 0, 10, 0.5, fh(28), 2, M.wall); box(27.75, 8, 7, 0.5, fh(28) - 8, 3, M.wall); casingZ(28, 7, 10, 8);
-gableWall(12, 28, 40, 0, TH);
+const H9 = 9;
+// master suite: flat 9' ceiling, no vault
+wallZ(12, 0, 12, H9, TH, [{ a: 7, b: 10, sill: 0, head: 8 }]); casingZ(12, 7, 10, 8); doorSlabZ(11.95, 7, 10, 8, 1);
+wallX(12, 0, 12, H9, TH, [{ a: 0.6, b: 3.6, sill: 0, head: 8 }]); casingX(12, 0.6, 3.6, 8);
+wallX(16, 12, 28, H9, TH, [{ a: 20.4, b: 23, sill: 0, head: 8 }, { a: 24.5, b: 27.5, sill: 0, head: 8 }]); casingX(16, 24.5, 27.5, 8); doorSlabX(16.1, 24.5, 27.5, 8, -1);
+wallZ(28, 0, 12, H9, TH, [{ a: 7, b: 10, sill: 0, head: 8 }]); casingZ(28, 7, 10, 8);
+wallX(12, 28, 40, H9, TH);
+const ceilMS = new THREE.MeshStandardMaterial({ map: mapped(T.wall, 10, 4), roughness: 0.95 });
+box(-0.25, 9, -0.25, 40.5, 0.35, 12.5, ceilMS); box(12, 9, 12, 16, 0.35, 4.3, ceilMS);
+// hidden bookcase door (D-9) on the bedroom side of IW-4, flanked by fixed shelving
+const bookCols = [0x8b3a2f, 0x2f4f6b, 0x6b7a3a, 0xc8a24a, 0x3a3a3a, 0x9a5b3c, 0x4a6b8a];
+function bookcase(bx, bw, mat) {
+  box(bx, 0, 15.05, bw, 7.8, 0.95, mat); box(bx + 0.05, 0.1, 15.0, bw - 0.1, 7.6, 0.1, mat);
+  for (let k = 0; k < 5; k++) box(bx + 0.06, 1.2 + k * 1.4, 15.0, bw - 0.12, 0.07, 0.9, mat);
+  for (let k = 0; k < 5; k++) for (let j = 0; j < Math.floor((bw - 0.3) / 0.3); j++) { const b = box(bx + 0.15 + j * 0.3, 1.28 + k * 1.4, 15.15, 0.2, 0.8 + ((j * 7 + k) % 3) * 0.15, 0.65, new THREE.MeshStandardMaterial({ color: bookCols[(j + k) % bookCols.length], roughness: 0.8 })); if ((j + k) % 4 === 3) b.visible = false; }
+}
+bookcase(17.4, 3.0, M.dark); bookcase(23.4, 1.1, M.dark);
+bookcase(20.4, 3.0, M.timber);
 wallZ(12, 12, 24.5, H9, TH, [{ a: 18.6, b: 21.6, sill: 0, head: 8 }]); casingZ(12, 18.6, 21.6, 8);
 wallZ(20, 16, 24.5, H9, TH); wallZ(24, 16, 24.5, H9, TH);
 wallX(24.5, 0, 24, H9, TH, [{ a: 8.6, b: 11.6, sill: 0, head: 8 }]); casingX(24.5, 8.6, 11.6, 8);
@@ -339,7 +352,10 @@ for (const [x, z, h] of [[2.5, 24.7, 0.3], [12.0, 24.7, 0.3], [4.9, 24.7, 0.3], 
 rbox(7, 0, 28, 10, CH, 4, M.cab, 0.05); box(6.75, CH, 27.75, 10.5, 0.2, 4.5, M.top); box(6.9, 0, 27.9, 10.2, 0.3, 4.2, M.black);
 for (let i = 0; i < 5; i++) { cyl(7.9 + i * 2 + 0.6, 0, 33.3, 0.55, 2.2, M.black, g, 0.5); cyl(7.9 + i * 2 + 0.6, 2.2, 33.3, 0.7, 0.25, M.leather); }
 for (let i = 0; i < 3; i++) { const x = 9.4 + i * 3.2; cyl(x, 7.0, 30, 0.15, 0.6, M.black, g, 0.6); cyl(x, 7.6, 30, 0.06, 1.4, M.black); cyl(x, 7.05, 30, 0.12, 0.35, M.bulb); }
-box(0.3, 0, 12.3, 6.6, 3, 2.4, M.appl); box(0.3, 0, 14.6, 2.4, 1.6, 4.6, M.dark); box(0.3, 0, 22.6, 8, 3, 1.6, M.cab); box(0.25, 3, 22.5, 8.1, 0.15, 1.8, M.top);
+box(0.3, 0, 12.3, 6.6, 3, 2.4, M.appl); box(0.3, 0, 22.6, 8, 3, 1.6, M.cab); box(0.25, 3, 22.5, 8.1, 0.15, 1.8, M.top);
+// dog station: raised wash tub with hand shower, food & water bowls
+box(0.3, 0, 14.8, 2.3, 2.3, 3.8, M.cabW); box(0.45, 2.0, 14.95, 2.0, 0.4, 3.5, tileMat(2, 3.5)); box(0.6, 2.05, 15.1, 1.7, 0.4, 3.2, M.white); cyl(0.6, 2.4, 16.7, 0.04, 1.6, M.black); box(0.55, 3.9, 16.4, 0.5, 0.08, 0.6, M.black);
+cyl(0.9, 0, 19.4, 0.45, 0.3, M.appl); cyl(2.0, 0, 19.4, 0.45, 0.3, M.appl); box(0.4, 0, 18.9, 2.2, 0.05, 1.1, M.dark);
 box(12.2, 0, 16.3, 1.4, 7, 7.5, M.cabW); box(13.8, 0, 16.3, 5.8, 7, 1.4, M.cabW);   // pantry shelving
 
 // ================= den / nook =================
@@ -408,7 +424,8 @@ const V = {
   nook: { p: [26, 5.6, 58.5], t: [37, 6.5, 44], w: 'Breakfast nook, looking at the L-stair and landing' },
   stair: { p: [32, 19, 63], t: [30, 8, 46], w: 'Stair: landing at the nook, 16 risers west along the den edge to the loft' },
   loft: { p: [36, 16.6, 38], t: [8, 12.5, 20], w: 'On the loft, looking across the open game room' },
-  master: { p: [24.5, 5.6, 15], t: [18.5, 5, 0], w: 'Master bedroom from the hall door — narrow windows over the nightstands, clerestory above' },
+  master: { p: [13.5, 5.6, 1.5], t: [23, 5, 15], w: 'Master bedroom — flat 9\' ceiling; the bookcase wall ahead hides the sliding door to the storage room' },
+  dog: { p: [7.5, 5.4, 20], t: [1, 2.5, 16.5], w: 'Mud room — dog wash station (hot/cold water + floor drain), washer & dryer beyond' },
   plan: { p: [20, 90, 100], t: [20, 3, 30], w: 'Plan check: roof removed — compare the stair, den/nook openings and loft footprint to A-1 / A-2', roofOff: true },
   doll: { p: [95, 75, 125], t: [20, 6, 30], w: 'Dollhouse view — roof lifted off', roofOff: true },
 };
