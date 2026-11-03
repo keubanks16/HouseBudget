@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Barndominium — Interior 3D</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1216;font-family:Inter,system-ui,-apple-system,sans-serif;color:#e8e6e1;overflow:hidden}
+  #c{width:100%;height:100%;display:block}
+  #ui{position:absolute;left:0;right:0;bottom:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;flex-wrap:wrap;gap:6px;justify-content:center;background:linear-gradient(transparent,rgba(10,12,16,.85) 40%)}
+  button{background:#1c2129;color:#e8e6e1;border:1px solid #39414c;border-radius:8px;padding:9px 13px;font-size:13px;font-weight:600;cursor:pointer}
+  button.on{background:#c8955a;color:#1a1308;border-color:#c8955a}
+  #title{position:absolute;top:10px;left:12px;font-size:13px;font-weight:700;letter-spacing:.3px;text-shadow:0 1px 3px #000}
+  #title span{display:block;font-weight:400;font-size:11px;color:#b8b4ac}
+  #hint{position:absolute;top:10px;right:12px;font-size:11px;color:#b8b4ac;text-align:right;text-shadow:0 1px 3px #000}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="title">40×60 Barndominium · Interior<span id="where">Standing inside the front door</span></div>
+<div id="hint">Drag to look · pinch / scroll to zoom<br>two fingers / right-drag to move</div>
+<div id="ui">
+  <button data-v="entry" class="on">Entry</button>
+  <button data-v="den">Den</button>
+  <button data-v="kitchen">Kitchen</button>
+  <button data-v="nook">Nook &amp; stair</button>
+  <button data-v="loft">Loft</button>
+  <button data-v="master">Master</button>
+  <button data-v="doll">Dollhouse</button>
+  <button id="roof">Roof: on</button>
+  <button id="loftf">Loft floor: on</button>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xf2d9b0);
+scene.fog = new THREE.Fog(0xf2d9b0, 150, 400);
+const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 600);
+const controls = new OrbitControls(camera, canvas); controls.enableDamping = true; controls.dampingFactor = 0.08; controls.maxPolarAngle = Math.PI * 0.98;
+
+// ---------- materials ----------
+const M = {
+  wall: new THREE.MeshStandardMaterial({ color: 0xf1ede6, roughness: 0.95 }),
+  ext: new THREE.MeshStandardMaterial({ color: 0x24272c, roughness: 0.8 }),
+  floor: new THREE.MeshStandardMaterial({ color: 0xb08a5c, roughness: 0.7 }),
+  tile: new THREE.MeshStandardMaterial({ color: 0xcfcac2, roughness: 0.5 }),
+  conc: new THREE.MeshStandardMaterial({ color: 0xbdb7ad, roughness: 0.9 }),
+  wood: new THREE.MeshStandardMaterial({ color: 0xd1a46b, roughness: 0.75, side: THREE.DoubleSide }),
+  timber: new THREE.MeshStandardMaterial({ color: 0xb9834a, roughness: 0.7 }),
+  steel: new THREE.MeshStandardMaterial({ color: 0x2b2f35, roughness: 0.5, metalness: 0.4 }),
+  roofTop: new THREE.MeshStandardMaterial({ color: 0x1e2126, roughness: 0.5, metalness: 0.3 }),
+  frame: new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.6 }),
+  glass: new THREE.MeshPhysicalMaterial({ color: 0xbfd8e8, transmission: 0.85, transparent: true, opacity: 0.55, roughness: 0.05, thickness: 0.1, side: THREE.DoubleSide }),
+  cab: new THREE.MeshStandardMaterial({ color: 0x3f4a46, roughness: 0.6 }),
+  cabW: new THREE.MeshStandardMaterial({ color: 0xe9e4da, roughness: 0.6 }),
+  top: new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.35 }),
+  appl: new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.35, metalness: 0.6 }),
+  stone: new THREE.MeshStandardMaterial({ color: 0x8d8678, roughness: 1 }),
+  fabric: new THREE.MeshStandardMaterial({ color: 0xd9d2c3, roughness: 1 }),
+  fabric2: new THREE.MeshStandardMaterial({ color: 0x7b8a6e, roughness: 1 }),
+  rug: new THREE.MeshStandardMaterial({ color: 0xb7a58d, roughness: 1 }),
+  dark: new THREE.MeshStandardMaterial({ color: 0x3a3632, roughness: 0.8 }),
+  rail: new THREE.MeshStandardMaterial({ color: 0x202326, roughness: 0.5, metalness: 0.5 }),
+  fire: new THREE.MeshStandardMaterial({ color: 0xff8a2a, emissive: 0xff5a00, emissiveIntensity: 1.2 }),
+  grass: new THREE.MeshStandardMaterial({ color: 0x6f8a4e, roughness: 1 }),
+  gravel: new THREE.MeshStandardMaterial({ color: 0x9a9690, roughness: 1 }),
+};
+
+// ---------- helpers (plan x → X, plan y (back→front) → Z, up → Y) ----------
+const PITCH = 5 / 12, EAVE = 16, RIDGE = EAVE + 20 * PITCH;
+const roofH = x => EAVE + (20 - Math.abs(x - 20)) * PITCH;
+const g = new THREE.Group(); scene.add(g);
+const roofG = new THREE.Group(); g.add(roofG);
+const loftG = new THREE.Group(); g.add(loftG);
+function box(x, y, z, w, h, d, mat, parent = g, shadow = true) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x + w / 2, y + h / 2, z + d / 2); m.castShadow = shadow; m.receiveShadow = true; parent.add(m); return m;
+}
+// wall along X (y=const) from x1..x2, with openings [{a,b,sill,head}]
+function wallX(z, x1, x2, h, t, openings = [], mat = M.wall, parent = g, gable = false) {
+  const segs = [{ a: x1, b: x2 }];
+  const ops = [...openings].sort((p, q) => p.a - q.a);
+  let cur = x1;
+  for (const o of ops) {
+    if (o.a > cur) solid(cur, o.a);
+    // below sill & above head
+    if (o.sill > 0) box(o.a, 0, z - t / 2, o.b - o.a, o.sill, t, mat, parent);
+    if (gable) gableWall(z, o.a, o.b, o.head, t, mat, parent); else box(o.a, o.head, z - t / 2, o.b - o.a, h - o.head, t, mat, parent);
+    cur = o.b;
+  }
+  if (cur < x2) solid(cur, x2);
+  function solid(a, b) { gable ? gableWall(z, a, b, 0, t, mat, parent) : box(a, 0, z - t / 2, b - a, h, t, mat, parent); }
+}
+function gableWall(z, a, b, bottom, t, mat, parent) {
+  const s = new THREE.Shape(); s.moveTo(a, bottom); s.lineTo(b, bottom); s.lineTo(b, roofH(b));
+  if (a < 20 && b > 20) s.lineTo(20, roofH(20)); s.lineTo(a, roofH(a)); s.lineTo(a, bottom);
+  const geo = new THREE.ExtrudeGeometry(s, { depth: t, bevelEnabled: false });
+  const m = new THREE.Mesh(geo, mat); m.position.z = z - t / 2; m.castShadow = m.receiveShadow = true; parent.add(m);
+}
+function wallZ(x, z1, z2, h, t, openings = [], mat = M.wall, parent = g) {
+  const ops = [...openings].sort((p, q) => p.a - q.a); let cur = z1;
+  for (const o of ops) {
+    if (o.a > cur) box(x - t / 2, 0, cur, t, h, o.a - cur, mat, parent);
+    if (o.sill > 0) box(x - t / 2, 0, o.a, t, o.sill, o.b - o.a, mat, parent);
+    box(x - t / 2, o.head, o.a, t, h - o.head, o.b - o.a, mat, parent);
+    cur = o.b;
+  }
+  if (cur < z2) box(x - t / 2, 0, cur, t, h, z2 - cur, mat, parent);
+}
+function windowX(z, a, b, sill, head, cols = 2, rows = 3) {
+  const w = b - a, h = head - sill, f = 0.18;
+  box(a, sill, z - 0.12, w, f, 0.24, M.frame); box(a, head - f, z - 0.12, w, f, 0.24, M.frame);
+  box(a, sill, z - 0.12, f, h, 0.24, M.frame); box(b - f, sill, z - 0.12, f, h, 0.24, M.frame);
+  for (let i = 1; i < cols; i++) box(a + w * i / cols - 0.05, sill, z - 0.1, 0.1, h, 0.2, M.frame, g, false);
+  for (let j = 1; j < rows; j++) box(a, sill + h * j / rows - 0.05, z - 0.1, w, 0.1, 0.2, M.frame, g, false);
+  const gl = new THREE.Mesh(new THREE.PlaneGeometry(w, h), M.glass); gl.position.set(a + w / 2, sill + h / 2, z); g.add(gl);
+}
+function windowZ(x, a, b, sill, head, cols = 2, rows = 3) {
+  const w = b - a, h = head - sill, f = 0.18;
+  box(x - 0.12, sill, a, 0.24, f, w, M.frame); box(x - 0.12, head - f, a, 0.24, f, w, M.frame);
+  box(x - 0.12, sill, a, 0.24, h, f, M.frame); box(x - 0.12, sill, b - f, 0.24, h, f, M.frame);
+  for (let i = 1; i < cols; i++) box(x - 0.1, sill, a + w * i / cols - 0.05, 0.2, h, 0.1, M.frame, g, false);
+  for (let j = 1; j < rows; j++) box(x - 0.1, sill + h * j / rows - 0.05, a, 0.2, 0.1, w, M.frame, g, false);
+  const gl = new THREE.Mesh(new THREE.PlaneGeometry(w, h), M.glass); gl.rotation.y = Math.PI / 2; gl.position.set(x, sill + h / 2, a + w / 2); g.add(gl);
+}
+
+// ---------- site ----------
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), M.grass); ground.rotation.x = -Math.PI / 2; ground.position.set(20, -0.05, 30); ground.receiveShadow = true; g.add(ground);
+box(-0.5, -0.02, -0.5, 41, 0.02, 61, M.floor);          // main floor (LVP)
+box(-15, -0.5, 25, 15, 0.5, 50, M.conc); box(0, -0.5, 60, 40, 0.5, 15, M.conc); // porch slabs
+box(-15, -0.6, 0, 15, 0.5, 25, M.gravel);
+box(13, -0.5, 75, 14, 0.5, 2.75, M.conc); box(13, -0.5, 75, 14, 0.17, 2.75, M.conc);
+// tile floors
+for (const [x, z, w, d] of [[28, 0, 12, 12], [28, 23, 12, 6], [28, 40, 7, 5], [0, 12, 12, 12.5]]) box(x, -0.01, z, w, 0.02, d, M.tile, g, false);
+box(0.3, 0, 0, 11.7, 0.01, 12, M.rug, g, false);
+
+// ---------- exterior walls (0.5' thick), 16' tall sides, gable ends ----------
+const T = 0.5;
+// back y=0
+wallX(0, 0, 40, 16, T, [
+  { a: 14.6, b: 16.6, sill: 2, head: 8 }, { a: 23.4, b: 25.4, sill: 2, head: 8 }, { a: 17, b: 23, sill: 10.5, head: 13 }, { a: 32, b: 36, sill: 5, head: 8 }
+], M.wall, g, true);
+windowX(0, 14.6, 16.6, 2, 8, 1, 3); windowX(0, 23.4, 25.4, 2, 8, 1, 3); windowX(0, 17, 23, 10.5, 13, 3, 1); windowX(0, 32, 36, 5, 8, 2, 1);
+// front y=60
+wallX(60, 0, 40, 16, T, [
+  { a: 5, b: 10, sill: 2.8, head: 11.25 }, { a: 14.8, b: 25.2, sill: 0, head: 13 }, { a: 30, b: 35, sill: 2.8, head: 11.25 }
+], M.wall, g, true);
+windowX(60, 5, 10, 2.8, 8.5, 4, 3); windowX(60, 5, 10, 8.5, 11.25, 4, 1);
+windowX(60, 30, 35, 2.8, 8.5, 4, 3); windowX(60, 30, 35, 8.5, 11.25, 4, 1);
+windowX(60, 14.8, 16.8, 0.1, 8.6, 1, 4); windowX(60, 23.2, 25.2, 0.1, 8.6, 1, 4);   // sidelights
+windowX(60, 16.8, 20, 0.1, 8.6, 2, 4); windowX(60, 20, 23.2, 0.1, 8.6, 2, 4);        // French pair
+windowX(60, 14.8, 25.2, 8.8, 13, 6, 1);                                               // transom
+// left x=0
+wallZ(0, 0, 60, 16, T, [{ a: 19.4, b: 22.4, sill: 0, head: 8 }, { a: 31, b: 35, sill: 3.5, head: 8 }, { a: 42, b: 45, sill: 0, head: 8 }]);
+windowZ(0, 31, 35, 3.5, 8, 2, 2); windowZ(0, 42, 45, 0.1, 8, 1, 4); windowZ(0, 19.4, 22.4, 4.5, 8, 1, 2); box(-0.25, 0, 19.4, 0.5, 4.5, 3, M.frame);
+// right x=40
+wallZ(40, 0, 60, 16, T, [{ a: 15, b: 19, sill: 2, head: 14.7 }, { a: 25, b: 27, sill: 11.7, head: 14.7 }, { a: 32, b: 36, sill: 2, head: 14.7 }, { a: 53, b: 57, sill: 2, head: 8 }]);
+box(39.75, 8, 15, 0.5, 3.7, 4, M.wall); box(39.75, 8, 32, 0.5, 3.7, 4, M.wall);
+for (const [a, b] of [[15, 19], [32, 36], [53, 57]]) windowZ(40, a, b, 2, 8, 2, 3);
+for (const [a, b] of [[15, 19], [32, 36], [25, 27]]) windowZ(40, a, b, 11.7, 14.7, b - a > 3 ? 2 : 1, 1);
+// exterior skins (black)
+box(-0.6, 0, -0.6, 0.1, 16, 61.2, M.ext, g, false); box(40.5, 0, -0.6, 0.1, 16, 61.2, M.ext, g, false);
+
+// ---------- interior walls ----------
+const H9 = 9;
+// full-height master suite walls (follow roof)
+const fh = x => roofH(x) - 0.3;
+box(11.75, 0, 0, 0.5, fh(12), 7, M.wall); box(11.75, 0, 10, 0.5, fh(12), 2, M.wall); box(11.75, 8, 7, 0.5, fh(12) - 8, 3, M.wall); // IW-1a with D-4
+gableWall(12, 3.6, 12, 0, T, M.wall, g); gableWall(12, 0, 0.6, 0, T, M.wall, g); gableWall(12, 0.6, 3.6, 8, T, M.wall, g);   // IW-3 with D-6
+gableWall(16, 12, 20.4, 0, T, M.wall, g); gableWall(16, 23, 24.5, 0, T, M.wall, g); gableWall(16, 27.5, 28, 0, T, M.wall, g); gableWall(16, 20.4, 23, 8, T, M.wall, g); gableWall(16, 24.5, 27.5, 8, T, M.wall, g); // IW-4
+box(27.75, 0, 0, 0.5, fh(28), 7, M.wall); box(27.75, 0, 10, 0.5, fh(28), 2, M.wall); box(27.75, 8, 7, 0.5, fh(28) - 8, 3, M.wall); // IW-2a with D-5
+gableWall(12, 28, 40, 0, T, M.wall, g); // IW-8
+// under-loft 9' walls
+wallZ(12, 12, 24.5, H9, T, [{ a: 18.6, b: 21.6, sill: 0, head: 8 }]);        // IW-1b
+wallZ(20, 16, 24.5, H9, T); wallZ(24, 16, 24.5, H9, T);
+wallX(24.5, 0, 24, H9, T, [{ a: 8.6, b: 11.6, sill: 0, head: 8 }]);         // IW-7
+wallZ(28, 12, 45, H9, T, [{ a: 17.5, b: 20.5, sill: 0, head: 8 }, { a: 23.5, b: 26, sill: 0, head: 8 }, { a: 30, b: 33, sill: 0, head: 8 }, { a: 40.5, b: 43, sill: 0, head: 8 }]); // IW-2b
+for (const z of [23, 29, 40, 45]) wallX(z, 28, 40, H9, T);
+wallZ(35, 40, 45, H9, T, [{ a: 42.2, b: 44.6, sill: 0, head: 8 }]);
+box(28, 9, 40, 12, 0.3, 5, M.wall);   // flat ceiling over ½ bath & closet
+// master bath flat ceiling? no — vaulted. Loft underside acts as ceiling elsewhere.
+
+// ---------- loft floor (2' thick) with railing ----------
+const lp = new THREE.Shape(); [[0, 12], [12, 12], [12, 16], [28, 16], [28, 12], [40, 12], [40, 45], [22.5, 45], [22.5, 50], [20, 50], [20, 40], [0, 40]].forEach(([x, z], i) => i ? lp.lineTo(x, z) : lp.moveTo(x, z));
+const loftGeo = new THREE.ExtrudeGeometry(lp, { depth: 2, bevelEnabled: false });
+const loft = new THREE.Mesh(loftGeo, M.wall); loft.rotation.x = Math.PI / 2; loft.position.y = 11; loft.castShadow = loft.receiveShadow = true; loftG.add(loft);
+const loftTop = new THREE.Mesh(new THREE.ShapeGeometry(lp), new THREE.MeshStandardMaterial({ color: 0xb08a5c, roughness: 0.7, side: THREE.DoubleSide })); loftTop.rotation.x = Math.PI / 2; loftTop.position.y = 11.02; loftTop.receiveShadow = true; loftG.add(loftTop);
+// fascia / rim
+// railing along edges
+function rail(x1, z1, x2, z2) {
+  const dx = x2 - x1, dz = z2 - z1, L = Math.hypot(dx, dz), n = Math.max(1, Math.round(L / 4));
+  for (let i = 0; i <= n; i++) { const t = i / n; box(x1 + dx * t - 0.15, 11, z1 + dz * t - 0.15, 0.3, 3.5, 0.3, M.rail, loftG); }
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(L, 0.25, 0.35), M.timber); cap.position.set(x1 + dx / 2, 14.4, z1 + dz / 2); cap.rotation.y = -Math.atan2(dz, dx); loftG.add(cap);
+  for (let k = 1; k <= 5; k++) { const c = new THREE.Mesh(new THREE.BoxGeometry(L, 0.03, 0.03), M.rail); c.position.set(x1 + dx / 2, 11 + k * 0.55, z1 + dz / 2); c.rotation.y = -Math.atan2(dz, dx); loftG.add(c); }
+}
+rail(0, 40, 20, 40); rail(20, 40, 20, 50); rail(20, 50, 22.5, 50); rail(22.5, 45, 40, 45);
+// walkway posts
+box(19.6, 0, 49.6, 0.6, 11, 0.6, M.timber); box(22.2, 0, 49.6, 0.6, 11, 0.6, M.timber);
+// ---------- stairs ----------
+const R = 11 / 18, TR = 10 / 12;
+box(35, 0, 50, 5, R, 1.667 - 0.9, M.wood); box(35, 0, 50.83, 5, 2 * R, 0.87, M.wood);
+box(35, 0, 45, 5, 2 * R, 5, M.wood);                                  // landing
+for (let i = 1; i <= 15; i++) box(35 - i * TR, 0, 45, TR, 2 * R + i * R, 5, M.wood);
+box(22.5, 0, 45, 0.3, 11, 5, M.wood);
+// stair rail
+for (let i = 0; i <= 15; i += 3) box(35 - i * TR - 0.15, 2 * R + i * R, 44.85, 0.3, 3.2, 0.3, M.rail);
+{ const L = Math.hypot(12.5, 16 * R); const c = new THREE.Mesh(new THREE.BoxGeometry(L, 0.25, 0.3), M.timber); c.position.set(28.75, 2 * R + 8 * R + 3.2, 44.85); c.rotation.z = -Math.atan2(16 * R, 12.5); g.add(c); }
+
+// ---------- roof (gable 5:12) ----------
+function slope(xa, xb, z1, z2, mat, parent, thick = 0.5, extraZ = 0) {
+  const L = Math.hypot(xb - xa, roofH(xb) - roofH(xa)), ang = Math.atan2(roofH(xb) - roofH(xa), xb - xa);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(L, thick, z2 - z1), mat);
+  m.position.set((xa + xb) / 2, (roofH(xa) + roofH(xb)) / 2 + thick / 2, (z1 + z2) / 2); m.rotation.z = ang; m.castShadow = m.receiveShadow = true; parent.add(m); return m;
+}
+slope(-1.5, 20, -1, 76.5, M.wood, roofG); slope(20, 41.5, -1, 76.5, M.wood, roofG);
+slope(-1.5, 20, -1, 76.5, M.roofTop, roofG, 0.1).position.y += 0.55; slope(20, 41.5, -1, 76.5, M.roofTop, roofG, 0.1).position.y += 0.55;
+// steel frames at 0,20,40,60 (columns + rafters)
+for (const z of [0.3, 20, 40, 59.7]) {
+  box(0.25, 0, z - 0.4, 0.5, 16, 0.8, M.steel, roofG); box(39.25, 0, z - 0.4, 0.5, 16, 0.8, M.steel, roofG);
+  for (const [a, b] of [[0, 20], [20, 40]]) { const L = Math.hypot(20, 20 * PITCH); const r = new THREE.Mesh(new THREE.BoxGeometry(L, 1.2, 0.6), M.steel); r.position.set((a + b) / 2, (roofH(a) + roofH(b)) / 2 - 0.7, z); r.rotation.z = Math.atan2(roofH(b) - roofH(a), b - a); roofG.add(r); }
+}
+// purlins
+for (let z = 5; z < 60; z += 5) for (const [a, b] of [[1, 19], [21, 39]]) { const L = Math.hypot(b - a, (roofH(b) - roofH(a))); const p = new THREE.Mesh(new THREE.BoxGeometry(L, 0.35, 0.25), M.steel); p.position.set((a + b) / 2, (roofH(a) + roofH(b)) / 2 - 0.2, z); p.rotation.z = Math.atan2(roofH(b) - roofH(a), b - a); roofG.add(p); }
+// side porch roof 3:12
+{ const L = Math.hypot(15, 15 * 0.25); const m = new THREE.Mesh(new THREE.BoxGeometry(L, 0.5, 76), M.wood); m.position.set(-7.5, 16 - 15 * 0.25 / 2 - 0.1, 37.5); m.rotation.z = Math.atan2(15 * 0.25, 15); roofG.add(m); }
+box(-15.5, 11.1, -0.5, 15.5, 0.9, 76, M.timber, roofG);
+// porch posts + piers
+for (const [x, z] of [[-15, 0], [-15, 12.5], [-15, 25], [-15, 37.5], [-15, 50], [-15, 62.5], [-15, 75], [0, 75], [40, 75]]) {
+  box(x - 1, 0, z - 1, 2, 3, 2, M.stone); box(x - 0.42, 3, z - 0.42, 0.84, 9.2, 0.84, M.timber);
+}
+// front timber truss at y=75
+box(-0.5, 12, 74.5, 41, 1, 0.9, M.timber, roofG); box(19.6, 13, 74.5, 0.8, roofH(20) - 13.5, 0.9, M.timber, roofG);
+for (const s of [-1, 1]) { const x2 = 20 + s * 8.5, L = Math.hypot(8.5, 8.5 * PITCH); const b = new THREE.Mesh(new THREE.BoxGeometry(L, 0.7, 0.7), M.timber); b.position.set(20 + s * 4.25, 14 + 4.25 * PITCH + 1.5, 74.95); b.rotation.z = s * Math.atan(PITCH) * -1; roofG.add(b); }
+box(-0.5, 12.2, 60, 1, 0.9, 15, M.timber, roofG); box(39.5, 12.2, 60, 1, 0.9, 15, M.timber, roofG);
+
+// ---------- kitchen ----------
+const CH = 3, CD = 2.1;
+box(0.3, 0, 26.7, CD, CH, 8.3, M.cab); box(0.3, CH, 26.6, CD + 0.1, 0.15, 8.5, M.top);
+box(0.4, CH - 0.5, 31.2, 1.6, 0.5, 3.6, M.appl); // sink
+box(0.3, 0, 35, CD, CH, 2, M.appl);              // DW
+box(0.3, 0, 24.7, 3.3, CH, 2, M.cab); box(3.6, 0, 24.7, 3.0, CH, 2, M.cabW); box(6.6, 0, 24.7, 1.8, CH, 2, M.cab);
+box(0.3, CH, 24.6, 8.2, 0.15, 2.2, M.top);
+box(12, 0, 24.7, 2, CH, 2, M.cab); box(14, 0, 24.7, 4, CH + 0.4, 2.2, M.appl); box(18, 0, 24.7, 2.5, CH, 2, M.cab); box(20.5, 0, 24.7, 3, 6.2, 2.6, M.appl); box(23.5, 0, 24.7, 0.4, CH, 2, M.cab);
+box(12, CH, 24.6, 2, 0.15, 2.2, M.top); box(18, CH, 24.6, 2.5, 0.15, 2.2, M.top);
+box(12, 5.2, 24.7, 11.9, 2.8, 1.1, M.cabW); box(14.2, 5.2, 24.7, 3.6, 1.3, 1.6, M.appl); // uppers + hood
+box(0.3, 5.2, 24.7, 8.2, 2.8, 1.1, M.cabW);
+box(7, 0, 28, 10, CH, 4, M.cab); box(6.9, CH, 27.9, 10.2, 0.2, 4.2, M.top);
+for (let i = 0; i < 5; i++) box(7.9 + i * 2, 0, 33, 1.2, 2.4, 1.2, M.dark);
+// pantry/mud bits
+box(0.3, 0, 12.3, 6.6, 3, 2.4, M.appl); box(0.3, 0, 14.6, 2.4, 1.6, 4.6, M.dark); box(0.3, 0, 22.6, 8, 3, 1.6, M.cab);
+
+// ---------- den / nook ----------
+box(0.25, 0, 50, 1.6, 5.5, 4, M.stone); box(0.3, 0.3, 50.8, 1.1, 2.6, 2.4, M.dark); box(0.6, 0.5, 51.2, 0.6, 1.3, 1.6, M.fire);
+box(0.25, 5.5, 51.2, 1.0, roofH(1) - 5.5, 1.6, M.ext);
+box(3, 0, 42, 12, 0.08, 14, M.rug, g, false);
+box(5, 0, 44, 8, 1.6, 3.2, M.fabric); box(5, 1.6, 44, 8, 1.4, 1, M.fabric); box(5, 0, 44, 1, 2.2, 3.2, M.fabric); box(12, 0, 44, 1, 2.2, 3.2, M.fabric);
+box(7, 0, 50, 4.5, 1.4, 2.2, M.wood);
+box(3, 0, 48, 2.6, 1.5, 2.6, M.fabric2); box(13.5, 0, 48, 2.6, 1.5, 2.6, M.fabric2);
+box(29, 0, 53, 7, 0.15, 3.5, M.wood); box(29.3, 0, 53.3, 0.3, 2.4, 0.3, M.dark); box(35.7, 0, 53.3, 0.3, 2.4, 0.3, M.dark); box(29.3, 0, 56.2, 0.3, 2.4, 0.3, M.dark); box(35.7, 0, 56.2, 0.3, 2.4, 0.3, M.dark);
+box(29, 2.4, 53, 7, 0.15, 3.5, M.wood);
+for (let i = 0; i < 3; i++) { box(29.8 + i * 2.3, 0, 51.4, 1.4, 1.5, 1.4, M.dark); box(29.8 + i * 2.3, 0, 57, 1.4, 1.5, 1.4, M.dark); }
+
+// ---------- bedrooms ----------
+function bed(x, z, w, d, back) {
+  box(x, 0, z, w, 1.6, d, M.fabric); box(x + 0.3, 1.6, z + 0.3, w - 0.6, 0.5, d - 0.6, M.cabW); box(x, 0, back ? z : z + d - 0.4, w, 3.6, 0.4, M.dark);
+  box(x + 0.4, 1.7, back ? z + 0.5 : z + d - 1.6, w / 2 - 0.6, 0.6, 1.1, M.cabW); box(x + w / 2 + 0.2, 1.7, back ? z + 0.5 : z + d - 1.6, w / 2 - 0.6, 0.6, 1.1, M.cabW);
+}
+bed(17, 0.5, 6, 7, true); box(14.8, 0, 0.5, 1.8, 2.2, 1.8, M.wood); box(23.4, 0, 0.5, 1.8, 2.2, 1.8, M.wood);
+bed(33, 14.5, 5, 6.5, true); bed(33, 35.3, 5, 6.5, false);
+// master bath
+box(31, 0, 0.4, 5.5, 2, 2.8, M.cabW); box(37, 0, 0.3, 2.8, 7, 4.2, M.glass); box(28.3, 0, 10, 11.4, 2.9, 1.8, M.cab); box(28.3, 2.9, 9.9, 11.5, 0.15, 2, M.top);
+// hall bath
+box(28.3, 0, 25.3, 2.4, 1.8, 5.4, M.cabW); box(34, 0, 29, 5.7, 2.9, 1.7, M.cab); box(34, 2.9, 28.9, 5.8, 0.15, 1.9, M.top);
+
+// ---------- loft furniture ----------
+box(4, 11, 20, 9, 1.6, 2.6, M.fabric2, loftG); box(4, 11, 20, 2.6, 1.6, 7.6, M.fabric2, loftG); box(4, 12.6, 20, 9, 1.2, 0.8, M.fabric2, loftG);
+box(16, 11, 24.5, 4.6, 2.5, 8.6, M.fabric, loftG); box(5.5, 11, 31.5, 7, 1.6, 1.2, M.dark, loftG); box(5.5, 12.8, 31.9, 7, 3.6, 0.2, M.rail, loftG);
+box(30, 11, 14, 7, 1.6, 3.2, M.fabric, loftG); box(31, 11, 31.5, 6, 2.4, 2.6, M.wood, loftG);
+
+// ---------- lights ----------
+scene.add(new THREE.HemisphereLight(0xfff1dc, 0x6b5b45, 0.55));
+const sun = new THREE.DirectionalLight(0xfff0d6, 1.6); sun.position.set(70, 60, 120); sun.target.position.set(20, 5, 30); scene.add(sun, sun.target);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -70; sc.right = 70; sc.top = 70; sc.bottom = -70; sc.near = 10; sc.far = 300; sun.shadow.bias = -0.0015;
+function pl(x, y, z, i = 0.6, c = 0xffd9a8) { const l = new THREE.PointLight(c, i, 40, 1.6); l.position.set(x, y, z); scene.add(l); }
+pl(12, 8, 30, 1.0); pl(10, 10, 50, 0.9); pl(30, 9, 54, 0.7); pl(20, 15, 26, 0.6); pl(20, 8, 8, 0.6); pl(34, 8, 19, 0.4); pl(34, 8, 35, 0.4);
+// pendants over island
+for (let i = 0; i < 3; i++) { box(8.8 + i * 3.2, 6.6, 29.8, 0.5, 0.5, 0.5, M.dark); box(9.0 + i * 3.2, 7.1, 30, 0.08, 1.9, 0.08, M.dark); }
+// chandelier-ish in den
+box(9.5, roofH(9.5) - 7, 46.5, 2.6, 0.4, 2.6, M.dark); box(10.7, roofH(9.5) - 6.6, 47.7, 0.1, 6.6, 0.1, M.dark);
+
+// ---------- views ----------
+const V = {
+  entry: { p: [20, 5.6, 57], t: [14, 7.5, 28], w: 'Standing inside the front door, looking toward the kitchen' },
+  den: { p: [4, 5.6, 57], t: [26, 9, 22], w: 'Den corner by the fireplace, looking across to the stair and loft' },
+  kitchen: { p: [19, 5.6, 39], t: [2, 4.5, 27], w: 'Kitchen — island, sink under the window, range on the back wall' },
+  nook: { p: [26, 5.6, 58], t: [38, 7, 42], w: 'Breakfast nook, looking at the L-stair and landing' },
+  loft: { p: [36, 16.6, 38], t: [8, 13, 20], w: 'On the loft, looking across the open game room toward the kitchen side' },
+  master: { p: [25.5, 5.6, 14], t: [30, 5, 1], w: 'Master bedroom from the hall door, narrow windows over the nightstands' },
+  doll: { p: [95, 75, 125], t: [20, 6, 30], w: 'Dollhouse view — roof lifted off', roofOff: true },
+};
+let roofOn = true, loftOn = true;
+function setView(k) {
+  const v = V[k]; camera.position.set(...v.p); controls.target.set(...v.t); controls.update();
+  document.getElementById('where').textContent = v.w;
+  document.querySelectorAll('[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === k));
+  if (v.roofOff && roofOn) toggleRoof();
+}
+function toggleRoof() { roofOn = !roofOn; roofG.visible = roofOn; document.getElementById('roof').textContent = 'Roof: ' + (roofOn ? 'on' : 'off'); }
+document.getElementById('roof').onclick = toggleRoof;
+document.getElementById('loftf').onclick = () => { loftOn = !loftOn; loftG.visible = loftOn; document.getElementById('loftf').textContent = 'Loft floor: ' + (loftOn ? 'on' : 'off'); };
+document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => setView(b.dataset.v));
+setView('entry');
+
+function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; if (canvas.width !== w || canvas.height !== h) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); } }
+renderer.setAnimationLoop(() => { resize(); controls.update(); renderer.render(scene, camera); });
+</script>
+</body>
+</html>
