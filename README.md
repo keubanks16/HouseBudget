@@ -8,6 +8,7 @@ Blank, fillable cost estimate worksheet / progress chart for our 40×60 barndomi
 - Edit mode to rename, add or remove items, sections, inspections and phases
 - Build Steps tab: 82-step construction order in 9 stages for the steel shell + wood interior build with inspection gates, a "Next up" card and progress
 - Cloud sync across devices via Firebase Firestore (project housebudget-a0972) using a private sync code
+- Subs tab: line items grouped by trade with plan-based scope, sub contact info, and PDF export (all subs, or a per-sub scope sheet with bid lines; budget numbers optional)
 - Saves automatically in the browser; Backup/Restore (JSON), CSV export and Print
 
 Open `index.html` or the GitHub Pages site. On a phone, use Share → Add to Home Screen.
